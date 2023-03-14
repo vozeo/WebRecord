@@ -4,8 +4,6 @@
 
 {{block 'content'}}
 <section id="features">
-    <h2 class="display-4 mb-3 text-center p-5">历史视频</h2>
-
     <div class="col-10 container-fluid text-center">
         <table class="table">
             <thead>
@@ -37,7 +35,8 @@
 
 {{ block 'script' }}
 <script>
-    axios.get('/record').then(res => {
+    axios.get('/file').then(res => {
+        console.log(res.data)
         let records = res.data;
         for (let id in records) {
             let cell = document.getElementById(id);

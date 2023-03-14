@@ -1,6 +1,6 @@
 const mysql = require('mysql')
 const util = require('util');
-const {databaseConfig} = require('./config_example')
+const {databaseConfig} = require('./config')
 const pool = mysql.createPool(databaseConfig);
 
 const database = async (sql, sqlParams = []) => {

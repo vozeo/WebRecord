@@ -27,8 +27,9 @@
                 <th scope="col">学号</th>
                 <th scope="col">姓名</th>
                 <th scope="col">专业</th>
-                <th scope="col">是否在线</th>
+                <th scope="col">在线数量</th>
                 <th id='screen-record' scope="col">屏幕录制</th>
+                <th id='screen-number' scope="col">屏幕数量</th>
                 <th id='screen-monitor' scope="col">实时查看</th>
                 <th id='camera-record' scope="col">摄像头录制</th>
                 <th id='camera-monitor' scope="col">实时查看</th>
@@ -43,8 +44,9 @@
                 <td>{{$value.stu_no}}</td>
                 <td>{{$value.stu_name}}</td>
                 <td>{{$value.stu_class_sname}}</td>
-                <td id="{{$value.stu_no}}-online">不在线</td>
+                <td id="{{$value.stu_no}}-online">0</td>
                 <td class="screen" id="{{$value.stu_no}}-screen">未录制</td>
+                <td class="screen-number" id="{{$value.stu_no}}-screen-number">0</td>
                 <td class="screen-device" id="{{$value.stu_no}}-screen-device"></td>
                 <td class="camera" id="{{$value.stu_no}}-camera">未录制</td>
                 <td class="camera-device" id="{{$value.stu_no}}-camera-device"></td>
@@ -68,6 +70,9 @@
                 document.getElementById(`${type}-monitor`).style.display = 'none';
                 document.querySelectorAll(`.${type}`).forEach(element => element.style.display = 'none')
                 document.querySelectorAll(`.${type}-device`).forEach(element => element.style.display = 'none')
+                if (type === 'screen') {
+                    document.querySelectorAll('screen-number').forEach(element => element.style.display = 'none')
+                }
             }
         }
         socket.on("connect", () => {
@@ -82,7 +87,7 @@
             Object.values(data).filter(user => user.stu_userlevel !== '1').forEach(user => {
                 const {stu_no, online, watchList, recordList} = user;
                 const onlineState = document.getElementById(`${stu_no}-online`);
-                onlineState.innerText = online > 0 ? "在线" : "不在线";
+                onlineState.innerText = online.toString();
                 onlineState.style.color = online > 0 ? "white" : "black";
                 onlineState.style.fontWeight = online > 0 ? "bolder" : "normal";
                 onlineState.className = online > 0 ? "bg-success" : "";
@@ -90,6 +95,11 @@
                     const recordState = document.getElementById(`${stu_no}-${type}`);
                     const deviceList = document.getElementById(`${stu_no}-${type}-device`);
                     deviceList.innerHTML = "";
+                    let screenNumber;
+                    if (type === 'screen') {
+                        screenNumber = document.getElementById(`${stu_no}-screen-number`);
+                        screenNumber.innerText = user.screenNumber;
+                    }
                     if (videoConfig.allowRecord[type] && Object.keys(recordList[type]).length > 0) {
                         recordState.innerText = "录制中";
                         recordState.style.color = "green";
@@ -101,6 +111,13 @@
                             deviceLink.href = `/live/?id=${stu_no}&type=${type}&device=${device}`;
                             deviceLink.target = "_blank";
                             deviceList.append(deviceLink, document.createElement('br'));
+                        }
+                        if (type === 'screen') {
+                            if (deviceCount > 0 && user.screenNumber > deviceCount) {
+                                screenNumber.style.color = "white";
+                                screenNumber.style.fontWeight = "bolder";
+                                screenNumber.className = "bg-danger";
+                            }
                         }
                     } else {
                         recordState.innerText = "未录制";

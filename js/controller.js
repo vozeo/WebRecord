@@ -26,7 +26,7 @@ let VideoConfig = {}, NetworkConfig = {};
 let VideoWidth = 1920, VideoHeight = 1080, VideoRate = 15, SliceTime = 3000;
 
 
-axios.get('/information').then((res) => {
+axios.get('/information').then(async (res) => {
     VideoConfig = res.data.videoConfig;
     NetworkConfig = res.data.networkConfig;
     SessionUser = res.data.sessionUser;
@@ -86,6 +86,7 @@ axios.get('/information').then((res) => {
             document.getElementById(`${type}-container`).style.display = 'block';
         }
     }
+    await sendScreenNumber();
 });
 
 const establishConnection = (type) => {
@@ -106,6 +107,9 @@ const establishConnection = (type) => {
     peer.on('disconnected', () => {
         peer.reconnect();
     });
+    if (RecordList[type].peer) {
+        RecordList[type].peer.destroy()
+    }
     RecordList[type].peer = peer;
 }
 
@@ -152,7 +156,6 @@ const sendNotification = (title, content) => {
 }
 
 const startRecord = (video, type) => {
-    console.log(video.getVideoTracks())
     const device = editStr(video.getVideoTracks()[0].id.split('-')[0]);
     const recorder = new MediaRecorder(video, {
         mimeType: MimeType,
@@ -190,6 +193,12 @@ const endRecord = (type) => {
     });
 }
 
+let IntervalId;
+const sendScreenNumber = async () => {
+    const screens = await window.getScreenDetails();
+    Socket.emit('screen', SessionUser.stu_no, screens.screens.length);
+}
+
 const recordButtonClick = (type) => {
     switch (RecordList[type].state) {
         case 'end':
@@ -201,13 +210,19 @@ const recordButtonClick = (type) => {
                     sendNotification('摄像头录制开始', '请前往录制窗口允许摄像头和麦克风权限，如之前已允许，则已经开始录制！', 'camera');
                 }
             }
-            invokeGetMedia(video => {
+            invokeGetMedia(async video => {
                 addStreamStopListener(video, () => {
                     if (RecordList[type].state === 'start') {
                         document.getElementById(`${type}-record-btn`).click();
                     }
                 });
-                if (type === 'screen') {
+                const permission = await navigator.permissions.query({
+                    name: 'window-placement'
+                });
+                if (permission.state !== 'granted') {
+                    alert('未选择同意“窗口管理”权限，请同意“窗口管理”权限！');
+                    return;
+                } else if (type === 'screen') {
                     const tracks = video.getTracks();
                     const hasShared = tracks.some(track => track.label.startsWith('screen'));
                     if (!hasShared) {
@@ -216,10 +231,10 @@ const recordButtonClick = (type) => {
                         return;
                     }
                 }
+                IntervalId = setInterval(sendScreenNumber, VideoConfig.sliceTime);
                 startRecord(video, type);
                 establishConnection(type);
             }, (error) => {
-                console.log(error);
                 if (RecordList[type].state === 'start') {
                     document.getElementById(`${type}-record-btn`).click();
                 }
@@ -229,6 +244,7 @@ const recordButtonClick = (type) => {
         case 'pause':
         case 'start':
             RecordList[type].state = 'end';
+            clearInterval(IntervalId);
             endRecord(type);
             break;
     }

@@ -4,7 +4,7 @@ const https = require('https');
 const express = require('express');
 const session = require('express-session');
 
-const {serverConfig, videoConfig, networkConfig} = require('./config_example')
+const {serverConfig, videoConfig, networkConfig} = require('./config')
 const {addLog, getAllUsers, getUserById, updateById} = require('./database')
 
 const app = express();
@@ -59,7 +59,8 @@ let AllUsers = {};
             stu_class_sname: user.stu_class_sname,
             watchList: {},
             recordList: {camera: {}, screen: {}},
-            online: 0
+            online: 0,
+            screenNumber: 0,
         };
     }
     console.log(getTime() + ' 服务器初始化完成');
@@ -75,7 +76,10 @@ app.use('/webrtc', webRTCServer);
 
 // SocketIO服务器
 
-const io = require("socket.io")(server);
+const { Server } = require("socket.io");
+const io = new Server(server, {
+    pingInterval: 10000
+});
 
 let UserNo = {};
 let WatchState = {};
@@ -92,7 +96,7 @@ io.on('connection', (socket) => {
         try {
             const src = AllUsers[srcId];
             if (type === 'online') {
-                await addLog(src, userIP, `建立socket连接：${socket.id}`);
+                await addLog(src, userIP, `建立 socket 连接`);
                 ++src.online;
                 UserNo[socket.id] = srcId;
             } else if (args === false) {
@@ -152,7 +156,8 @@ io.on('connection', (socket) => {
             } else {
                 const src = AllUsers[UserNo[socket.id]];
                 --src.online;
-                await addLog(src, userIP, `断开socket连接：${socket.id}`);
+                src.screenNumber = 0;
+                await addLog(src, userIP, `断开 socket 连接`);
                 for (let type in src.recordList) {
                     if (socket.id in src.recordList[type]) {
                         await addLog(src, userIP, `${type === 'screen' ? '屏幕' : '摄像头'}录制被中断：${src.recordList[type][socket.id].device}`);
@@ -167,10 +172,24 @@ io.on('connection', (socket) => {
             }, userIP, `Socket disconnect 错误：${error.message}`);
         }
     });
+    socket.on('screen', async (srcId, number) => {
+        try {
+            const src = AllUsers[srcId];
+            if (number !== src.screenNumber) {
+                await addLog(src, userIP, `屏幕数量由${src.screenNumber}变为${number}`);
+            }
+            src.screenNumber = number;
+            io.emit('state', AllUsers);
+        } catch (error) {
+            await addLog({
+                stu_no: "none", stu_cno: "none"
+            }, userIP, `Socket screen 错误：${error.message}`);
+        }
+    });
     socket.on('file', async (srcId, type, device, time, data) => {
         try {
             const name = `${srcId}-${type}-${device}`;
-            const partName = `u${name}-${time}.webm`;
+            const partName = `u${srcId}-${type}-${time}-${device}.webm`;
             const fullName = `${serverConfig.savePath}/u${srcId}/${partName}`;
             if (partName === FileList[name]) {
                 fs.appendFileSync(fullName, data);
@@ -178,7 +197,6 @@ io.on('connection', (socket) => {
                 await addLog(AllUsers[srcId], userIP, `创建录制文件：${partName}`);
                 fs.writeFileSync(fullName, data);
                 FileList[name] = partName;
-
             }
         } catch (error) {
             await addLog({
@@ -265,15 +283,14 @@ app.get('/information', auth, async (req, res) => {
     res.send({videoConfig: videoConfig, networkConfig: networkConfig, sessionUser: req.session.user});
 });
 
-app.get('/record', auth, opAuth, async (req, res) => {
+app.get('/file', auth, opAuth, async (req, res) => {
     const userIP = req.ip;
     const history = {};
-    for (const user of AllUsers) {
+    Object.values(AllUsers).forEach(user => {
         if (user.stu_userlevel !== '1') {
-            const path = serverConfig.savePath + '/u' + user.stu_no + '/';
-            history[user.stu_no] = fs.readdirSync(path);
+            history[user.stu_no] = fs.readdirSync(`${serverConfig.savePath}/u${user.stu_no}/`);
         }
-    }
+    });
     await addLog(AllUsers[req.session.user.stu_no], userIP, '查看历史视频');
     res.send(history);
 });
