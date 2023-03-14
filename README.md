@@ -4,6 +4,8 @@
 
 ## Introductions
 
+This project is from my [original project](https://github.com/vozeo/RemoteRecord), refactoring all the underlying code, improving the design of the recording function, solving many problems and adding some features.
+
 This project is a browser-side recording system based on WebRTC technology, with functions such as recording screen, recording camera, real-time view monitoring, and real-time server saving.
 
 The project is written in Node.js + Javascript + Express.
