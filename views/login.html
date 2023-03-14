@@ -1,0 +1,51 @@
+{{extend './template.html'}}
+
+{{block 'title'}}登录{{/block}}
+
+{{block 'head'}}
+{{/block}}
+
+{{block 'content'}}
+<section class="vh-100">
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col col-xl-10">
+                <div class="card" style="border-radius: 2rem;">
+                    <div class="row g-0">
+                        <div class="col-md-6 col-lg-5 d-none d-md-block">
+                            <img src="{{file}}"
+                                 alt="Tongji University" class="img-fluid" style="border-radius: 2rem 0 0 2rem;"/>
+                        </div>
+                        <div class="col-md-6 col-lg-6 px-4 d-flex align-items-center">
+                            <div class="card-body p-4 p-lg-3 text-black">
+                                <form>
+                                    <div class="d-flex align-items-center mb-3 pb-1">
+                                        <span class="h1 fw-bold mb-0">Tongji</span>
+                                    </div>
+                                    <h5 class="fw-normal mb-3 pb-3" style="letter-spacing: 1px;">登录</h5>
+                                    <div class="form-outline mb-4">
+                                        <input type="text" id="username" class="form-control form-control-lg" required/>
+                                        <label class="form-label" for="username">用户名</label>
+                                    </div>
+                                    <div class="form-outline mb-4">
+                                        <input type="password" id="password" class="form-control form-control-lg" required/>
+                                        <label class="form-label" for="password">密码</label>
+                                    </div>
+
+                                    <div class="pt-1 mb-4 d-grid gap-2">
+                                        <button id="submit" class="btn btn-dark btn-lg" type="button">登录</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{{/block}}
+
+{{block 'script'}}
+<script src="../js/login.js"></script>
+{{/block}}

@@ -1,0 +1,64 @@
+{{extend './template.html'}}
+
+{{block 'title'}}{{id}}{{name}}{{typeName}}{{/block}}
+
+{{block 'head'}}
+<style>
+    video {
+        position: absolute;
+        top: 72px;
+        bottom: 40px;
+        height: calc(100% - 112px);
+        width: 100%;
+    }
+</style>
+{{/block}}
+
+{{block 'content'}}
+
+<video id="player" controls autoplay muted></video>
+
+{{/block}}
+
+{{block 'top'}}
+<span class="navbar-brand fw-bold" href="/">{{id}} {{name}} {{typeName}}</span>
+{{/block}}
+
+{{block 'script'}}
+<script src="../node_modules/peerjs/dist/peerjs.min.js"></script>
+<script type="text/javascript">
+    axios.get('/information').then((res) => {
+        const {networkConfig, sessionUser} = res.data;
+        let url = new URL(window.location.href);
+        let params = new URLSearchParams(url.search);
+        const {id, type, device} = Object.fromEntries(params.entries());
+        const socket = io(`https://${document.domain}:${networkConfig.socketPort}`, {rejectUnauthorized: false});
+        socket.on("connect", () => {
+            socket.emit('watch', sessionUser.stu_no, id);
+        });
+        const peerId = id + type + device;
+        console.log(peerId)
+        const peer = new Peer({
+            host: document.domain,
+            port: networkConfig.socketPort,
+            path: "/webrtc",
+            secure: true,
+            config: {
+                'iceServers': [{url: 'stun:stun.l.google.com:19302'}, {
+                    url: `turn:${document.domain}:${networkConfig.turnServerPort}`,
+                    username: networkConfig.turnServerUsername,
+                    credential: networkConfig.turnServerCredential,
+                }],
+            }
+        });
+        peer.on('open', () => peer.connect(peerId));
+        peer.on('call', (call) => {
+            call.on('stream', (stream) => {
+                document.getElementById("player").srcObject = stream;
+                document.getElementById('player').play();
+            });
+            call.answer(null);
+        });
+    });
+</script>
+{{/block}}
