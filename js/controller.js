@@ -72,6 +72,7 @@ axios.get('/information').then(async (res) => {
                 if (window.Notification.permission === "granted") {
                     sendNotification(`${type === 'screen' ? '屏幕' : '摄像头'}录制结束`, `${type === 'screen' ? '屏幕' : '摄像头'}录制已被结束！`, 'end');
                 }
+                setTimeout(() => {location.reload(true);}, 3000);
             }
         }
     });
