@@ -4,8 +4,8 @@ const https = require('https');
 const express = require('express');
 const session = require('express-session');
 
-const {serverConfig, videoConfig, networkConfig} = require('./config')
-const {addLog, getAllUsers, getUserById, updateById} = require('./database')
+const { serverConfig, videoConfig, networkConfig } = require('./config')
+const { addLog, getAllUsers, getUserById, updateById } = require('./database')
 
 const app = express();
 const server = https.createServer({
@@ -49,7 +49,7 @@ let AllUsers = {};
     let allUsersArray = await getAllUsers();
     for (let user of allUsersArray) {
         const path = serverConfig.savePath + '/u' + user.stu_no + '/';
-        fs.mkdirSync(path, {recursive: true});
+        fs.mkdirSync(path, { recursive: true });
         AllUsers[user.stu_no] = {
             stu_no: user.stu_no,
             stu_cno: user.stu_cno,
@@ -58,7 +58,7 @@ let AllUsers = {};
             stu_userlevel: user.stu_userlevel,
             stu_class_sname: user.stu_class_sname,
             watchList: {},
-            recordList: {camera: {}, screen: {}},
+            recordList: { camera: {}, screen: {} },
             online: 0,
             screenNumber: 0,
         };
@@ -68,7 +68,7 @@ let AllUsers = {};
 
 // WebRTC的WebSocket服务器
 
-const {ExpressPeerServer} = require("peer");
+const { ExpressPeerServer } = require("peer");
 const webRTCServer = ExpressPeerServer(server, {
     path: '/',
 });
@@ -78,7 +78,9 @@ app.use('/webrtc', webRTCServer);
 
 const { Server } = require("socket.io");
 const io = new Server(server, {
-    pingInterval: 10000
+    pingInterval: 10000,
+    pingTimeout: 60000,
+    maxHttpBufferSize: 1e8
 });
 
 let UserNo = {};
@@ -240,15 +242,15 @@ const noAuth = async (req, res, next) => {
 const ImageCount = fs.readdirSync('./images').length;
 
 app.get('/', auth, async (req, res) => {
-    res.render('index.html', {sessionUser: req.session.user});
+    res.render('index.html', { sessionUser: req.session.user });
 });
 
 app.get('/record', auth, async (req, res) => {
-    res.render('record.html', {sessionUser: req.session.user});
+    res.render('record.html', { sessionUser: req.session.user });
 });
 
 app.get('/login', noAuth, async (req, res) => {
-    res.render('login.html', {file: `../images/${Math.floor(Math.random() * ImageCount) + 1}.jpg`});
+    res.render('login.html', { file: `../images/${Math.floor(Math.random() * ImageCount) + 1}.jpg` });
 });
 
 app.get('/password', auth, async (req, res) => {
@@ -258,7 +260,7 @@ app.get('/password', auth, async (req, res) => {
 });
 
 app.get('/history', auth, opAuth, async (req, res) => {
-    res.render('history.html', {user: Object.values(AllUsers)});
+    res.render('history.html', { user: Object.values(AllUsers) });
 });
 
 app.get('/monitor', auth, opAuth, async (req, res) => {
@@ -280,7 +282,7 @@ app.get('/live', auth, opAuth, async (req, res) => {
 // 获取信息
 
 app.get('/information', auth, async (req, res) => {
-    res.send({videoConfig: videoConfig, networkConfig: networkConfig, sessionUser: req.session.user});
+    res.send({ videoConfig: videoConfig, networkConfig: networkConfig, sessionUser: req.session.user });
 });
 
 app.get('/file', auth, opAuth, async (req, res) => {
@@ -306,7 +308,7 @@ const handleRangeRequest = (req, res, fileName, fileSize) => {
         return;
     }
     const chunkSize = (end - start) + 1;
-    const file = fs.createReadStream(fileName, {start, end});
+    const file = fs.createReadStream(fileName, { start, end });
     const head = {
         'Content-Range': `bytes ${start}-${end}/${fileSize}`,
         'Accept-Ranges': 'bytes',
@@ -350,7 +352,7 @@ app.post('/disable', auth, opAuth, async (req, res) => {
             code: -1, message: "未找到该学号！"
         });
     }
-    await updateById([{stu_enable: '0'}, user.stu_no]);
+    await updateById([{ stu_enable: '0' }, user.stu_no]);
     delete AllUsers[user.stu_no]
     io.emit('disable', user.stu_no);
     io.emit('state', AllUsers);
@@ -426,7 +428,7 @@ app.post('/password', auth, async (req, res) => {
         });
     }
 
-    await updateById([{stu_password: cryptPwd(req.body.newPassword)}, user.stu_no]);
+    await updateById([{ stu_password: cryptPwd(req.body.newPassword) }, user.stu_no]);
     await addLog(user, userIP, "修改密码成功");
     res.send({
         code: 0, message: "修改密码成功！"

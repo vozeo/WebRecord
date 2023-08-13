@@ -1,6 +1,6 @@
 const mysql = require('mysql')
 const util = require('util');
-const {databaseConfig} = require('./config')
+const { databaseConfig } = require('./config')
 const pool = mysql.createPool(databaseConfig);
 
 const database = async (sql, sqlParams = []) => {
@@ -13,6 +13,8 @@ const database = async (sql, sqlParams = []) => {
         return results;
     } catch (err) {
         console.error(err);
+    } finally {
+        if (connection) connection.release();
     }
 };
 
@@ -40,4 +42,4 @@ const updateById = async (arr) => {
     await database(sql, arr);
 };
 
-module.exports = {addLog, getAllUsers, getUserById, updateById}
+module.exports = { addLog, getAllUsers, getUserById, updateById }

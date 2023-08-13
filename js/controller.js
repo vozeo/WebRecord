@@ -20,7 +20,6 @@ const getTime = (date = new Date()) => `${date.toLocaleString('zh-CN', {
 }).replaceAll(':', '-')}`;
 const editStr = str => str.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
 
-const MimeType = 'video/webm;codecs=h264';
 let Socket, SessionUser, AllTime = getTime();
 let VideoConfig = {}, NetworkConfig = {};
 let VideoWidth = 1920, VideoHeight = 1080, VideoRate = 15, SliceTime = 3000;
@@ -38,7 +37,7 @@ axios.get('/information').then(async (res) => {
 
     Notification.requestPermission().then();
 
-    Socket = io(`https://${document.domain}:${NetworkConfig.socketPort}`, {rejectUnauthorized: false});
+    Socket = io(`https://${document.domain}:${NetworkConfig.socketPort}`, { rejectUnauthorized: false });
     Socket.on('connect', () => {
         Socket.emit('message', SessionUser.stu_no, 'online', true, () => {
             document.getElementById('online-state-btn').innerText = '已连接';
@@ -72,7 +71,7 @@ axios.get('/information').then(async (res) => {
                 if (window.Notification.permission === "granted") {
                     sendNotification(`${type === 'screen' ? '屏幕' : '摄像头'}录制结束`, `${type === 'screen' ? '屏幕' : '摄像头'}录制已被结束！`, 'end');
                 }
-                setTimeout(() => {location.reload(true);}, 3000);
+                setTimeout(() => { location.reload(true); }, 3000);
             }
         }
     });
@@ -93,7 +92,7 @@ axios.get('/information').then(async (res) => {
 const establishConnection = (type) => {
     const peer = new Peer(SessionUser.stu_no + type + RecordList[type].device, {
         host: document.domain, port: NetworkConfig.socketPort, path: "/webrtc", secure: true, config: {
-            'iceServers': [{url: 'stun:stun.l.google.com:19302'}, {
+            'iceServers': [{ url: 'stun:stun.l.google.com:19302' }, {
                 url: `turn:${document.domain}:${NetworkConfig.turnServerPort}`,
                 username: NetworkConfig.turnServerUsername,
                 credential: NetworkConfig.turnServerCredential,
@@ -136,7 +135,7 @@ const addStreamStopListener = (stream, callback) => {
 const invokeGetMedia = (success, error, type) => {
     const constraints = {
         audio: true, video: {
-            width: {ideal: VideoWidth}, height: {ideal: VideoHeight}, frameRate: {ideal: VideoRate}
+            width: { ideal: VideoWidth }, height: { ideal: VideoHeight }, frameRate: { ideal: VideoRate }
         }
     };
     if (type === 'screen') {
@@ -159,14 +158,14 @@ const sendNotification = (title, content) => {
 const startRecord = (video, type) => {
     const device = editStr(video.getVideoTracks()[0].id.split('-')[0]);
     const recorder = new MediaRecorder(video, {
-        mimeType: MimeType,
+        mimeType: VideoConfig.mimeType,
     });
     RecordList[type] = {
         state: 'start', device: device, stream: video, recorder: recorder,
     }
     recorder.ondataavailable = (event) => {
         let fileObject = new File([event.data], device, {
-            type: MimeType
+            type: VideoConfig.mimeType
         });
         Socket.emit('file', SessionUser.stu_no, type, device, AllTime, fileObject);
     }

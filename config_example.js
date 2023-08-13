@@ -20,6 +20,7 @@ const videoConfig = {
         screen: true,
         camera: true,
     },
+    mimeType: 'video/webm;codecs=h264'
 };
 
 const networkConfig = {
