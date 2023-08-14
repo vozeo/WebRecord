@@ -21,38 +21,42 @@
     <div class="col-10 container-fluid text-center">
         <table class="table">
             <thead>
-            <tr>
-                <th scope="col">序号</th>
-                <th scope="col">年级</th>
-                <th scope="col">学号</th>
-                <th scope="col">姓名</th>
-                <th scope="col">专业</th>
-                <th scope="col">在线数量</th>
-                <th id='screen-record' scope="col">屏幕录制</th>
-                <th id='screen-number' scope="col">屏幕数量</th>
-                <th id='screen-monitor' scope="col">实时查看</th>
-                <th id='camera-record' scope="col">摄像头录制</th>
-                <th id='camera-monitor' scope="col">实时查看</th>
-                <th scope="col">监考</th>
-            </tr>
+                <tr>
+                    <th scope="col">序号</th>
+                    <th scope="col">学号</th>
+                    <th scope="col">姓名</th>
+                    <th scope="col">在线数量</th>
+                    <th id='screen-record' scope="col">屏幕录制</th>
+                    <!-- <th id='screen-number' scope="col">屏幕数量</th> -->
+                    <th id='screen-monitor' scope="col">实时查看</th>
+                    <th id='camera-record' scope="col">摄像头录制</th>
+                    <th id='camera-monitor' scope="col">实时查看</th>
+                    <th scope="col">中断次数</th>
+                    <th scope="col">累计时长</th>
+                    <th scope="col">禁止参加考试</th>
+                    <th scope="col">允许新IP登录</th>
+                    <th scope="col">监考</th>
+                </tr>
             </thead>
             <tbody id="table-body">
-            {{each userList}}
-            <tr>
-                <td>{{$index + 1}}</td>
-                <td>{{$value.stu_grade}}</td>
-                <td>{{$value.stu_no}}</td>
-                <td>{{$value.stu_name}}</td>
-                <td>{{$value.stu_class_sname}}</td>
-                <td id="{{$value.stu_no}}-online">0</td>
-                <td class="screen" id="{{$value.stu_no}}-screen">未录制</td>
-                <td class="screen-number" id="{{$value.stu_no}}-screen-number">0</td>
-                <td class="screen-device" id="{{$value.stu_no}}-screen-device"></td>
-                <td class="camera" id="{{$value.stu_no}}-camera">未录制</td>
-                <td class="camera-device" id="{{$value.stu_no}}-camera-device"></td>
-                <td id="{{$value.stu_no}}-monitor">/</td>
-            </tr>
-            {{/each}}
+                {{each userList}}
+                <tr>
+                    <td>{{$index + 1}}</td>
+                    <td>{{$value.sno}}</td>
+                    <td>{{$value.name}}</td>
+                    <td id="{{$value.sno}}-online">0</td>
+                    <td class="screen" id="{{$value.sno}}-screen">未录制</td>
+                    <!-- <td class="screen-number" id="{{$value.sno}}-screen-number">0</td> -->
+                    <td class="screen-device" id="{{$value.sno}}-screen-device"></td>
+                    <td class="camera" id="{{$value.sno}}-camera">未录制</td>
+                    <td class="camera-device" id="{{$value.sno}}-camera-device"></td>
+                    <td class="interruptions" id="{{$value.sno}}-interruptions"></td>
+                    <td class="accumulated-duration" id="{{$value.sno}}-accumulated-duration"></td>
+                    <td><input type="checkbox" data-stu="{{ $value.sno }}" class="forbid-exam"></td>
+                    <td><input type="checkbox" data-stu="{{ $value.sno }}" class="allow-new-ip"></td>
+                    <td id="{{$value.sno}}-monitor">/</td>
+                </tr>
+                {{/each}}
             </tbody>
         </table>
     </div>
@@ -61,18 +65,48 @@
 
 {{ block 'script' }}
 <script>
+    function formatMilliseconds(ms) {
+        const oneSecond = 1000;
+        const oneMinute = oneSecond * 60;
+        const oneHour = oneMinute * 60;
+
+        let remainingMilliseconds = ms;
+
+        const hours = Math.floor(remainingMilliseconds / oneHour);
+        remainingMilliseconds -= hours * oneHour;
+
+        const minutes = Math.floor(remainingMilliseconds / oneMinute);
+        remainingMilliseconds -= minutes * oneMinute;
+
+        const seconds = Math.floor(remainingMilliseconds / oneSecond);
+
+        let formattedString = '';
+
+        if (hours > 0) {
+            formattedString += `${hours}小时`;
+        }
+        if (minutes > 0) {
+            formattedString += `${minutes}分`;
+        }
+        if (seconds > 0) {
+            formattedString += `${seconds}秒`;
+        }
+
+        return formattedString || '0秒';
+    }
+
     axios.get('/information').then((res) => {
-        const {networkConfig, videoConfig, sessionUser} = res.data;
-        const socket = io(`https://${document.domain}:${networkConfig.socketPort}`, {rejectUnauthorized: false});
+        const { networkConfig, videoConfig, sessionUser } = res.data;
+        const socket = io(`https://${document.domain}:${networkConfig.socketPort}`, { rejectUnauthorized: false });
         for (const type in videoConfig.allowRecord) {
             if (!videoConfig.allowRecord[type]) {
                 document.getElementById(`${type}-record`).style.display = 'none';
                 document.getElementById(`${type}-monitor`).style.display = 'none';
                 document.querySelectorAll(`.${type}`).forEach(element => element.style.display = 'none')
                 document.querySelectorAll(`.${type}-device`).forEach(element => element.style.display = 'none')
-                if (type === 'screen') {
-                    document.querySelectorAll('screen-number').forEach(element => element.style.display = 'none')
-                }
+                // if (type === 'screen') {
+                //     document.querySelectorAll('screen-number').forEach(element => element.style.display = 'none')
+                // }
             }
         }
         socket.on("connect", () => {
@@ -83,63 +117,83 @@
         socket.on('disable', (arg) => {
             location.reload();
         });
-        socket.on('state', data => {
-            Object.values(data).filter(user => user.stu_userlevel !== '1').forEach(user => {
-                const {stu_no, online, watchList, recordList} = user;
-                const onlineState = document.getElementById(`${stu_no}-online`);
-                onlineState.innerText = online.toString();
-                onlineState.style.color = online > 0 ? "white" : "black";
-                onlineState.style.fontWeight = online > 0 ? "bolder" : "normal";
-                onlineState.className = online > 0 ? "bg-success" : "";
-                for (const type in recordList) {
-                    const recordState = document.getElementById(`${stu_no}-${type}`);
-                    const deviceList = document.getElementById(`${stu_no}-${type}-device`);
-                    deviceList.innerHTML = "";
-                    let screenNumber;
-                    if (type === 'screen') {
-                        screenNumber = document.getElementById(`${stu_no}-screen-number`);
-                        screenNumber.innerText = user.screenNumber;
+        axios.get('/stulist').then((result) => {
+            const userList = {};
+            result.data.stulist.forEach(user => {
+                userList[user.sno] = user;
+                const userElement = document.querySelector(`[data-stu="${user.sno}"]`);
+                if (userElement) {
+                    const allowExamCheckbox = userElement.closest('tr').querySelector('.forbid-exam');
+                    const allowNewIPCheckbox = userElement.closest('tr').querySelector('.allow-new-ip');
+                    if (allowExamCheckbox) {
+                        allowExamCheckbox.checked = user.is_forbidden === '1';
                     }
-                    if (videoConfig.allowRecord[type] && Object.keys(recordList[type]).length > 0) {
-                        recordState.innerText = "录制中";
-                        recordState.style.color = "green";
-                        let deviceCount = 0;
-                        for (const id in recordList[type]) {
-                            const device = recordList[type][id].device;
-                            let deviceLink = document.createElement("a");
-                            deviceLink.innerText = `${type === "screen" ? "屏幕" : "摄像头"}${++deviceCount}`;
-                            deviceLink.href = `/live/?id=${stu_no}&type=${type}&device=${device}`;
-                            deviceLink.target = "_blank";
-                            deviceList.append(deviceLink, document.createElement('br'));
-                        }
-                        if (type === 'screen') {
-                            if (deviceCount > 0 && user.screenNumber > deviceCount) {
-                                screenNumber.style.color = "white";
-                                screenNumber.style.fontWeight = "bolder";
-                                screenNumber.className = "bg-danger";
+                    if (allowNewIPCheckbox) {
+                        allowNewIPCheckbox.checked = user.enable_newip === '1';
+                    }
+                }
+            });
+            socket.on('state', data => {
+                Object.values(data).filter(user => user.stu_userlevel === '0' && user.stu_no in userList).forEach(user => {
+                    const { stu_no, online, watchList, recordList } = user;
+                    const onlineState = document.getElementById(`${stu_no}-online`);
+                    onlineState.innerText = online.toString();
+                    onlineState.style.color = online > 0 ? "white" : "black";
+                    onlineState.style.fontWeight = online > 0 ? "bolder" : "normal";
+                    onlineState.className = online > 0 ? "bg-success" : "";
+                    for (const type in recordList) {
+                        const recordState = document.getElementById(`${stu_no}-${type}`);
+                        const deviceList = document.getElementById(`${stu_no}-${type}-device`);
+                        deviceList.innerHTML = "";
+                        // let screenNumber;
+                        // if (type === 'screen') {
+                        //     screenNumber = document.getElementById(`${stu_no}-screen-number`);
+                        //     screenNumber.innerText = user.screenNumber;
+                        // }
+                        const interruptions = document.getElementById(`${stu_no}-interruptions`);
+                        interruptions.innerText = user.interruptions.toString();
+                        const accumulatedDuration = document.getElementById(`${stu_no}-accumulated-duration`);
+                        accumulatedDuration.innerText = formatMilliseconds(user.accumulatedDuration);
+                        if (videoConfig.allowRecord[type] && Object.keys(recordList[type]).length > 0) {
+                            recordState.innerText = "录制中";
+                            recordState.style.color = "green";
+                            let deviceCount = 0;
+                            for (const id in recordList[type]) {
+                                const device = recordList[type][id].device;
+                                let deviceLink = document.createElement("a");
+                                deviceLink.innerText = `${type === "screen" ? "屏幕" : "摄像头"}${++deviceCount}`;
+                                deviceLink.href = `/live/?id=${stu_no}&type=${type}&device=${device}`;
+                                deviceLink.target = "_blank";
+                                deviceList.append(deviceLink, document.createElement('br'));
                             }
+                            if (type === 'screen') {
+                                if (deviceCount > 0 && user.screenNumber > deviceCount) {
+                                    screenNumber.style.color = "white";
+                                    screenNumber.style.fontWeight = "bolder";
+                                    screenNumber.className = "bg-danger";
+                                }
+                            }
+                        } else {
+                            recordState.innerText = "未录制";
+                            recordState.style.color = "black";
+                        }
+                    }
+                    let monitorList = document.getElementById(`${stu_no}-monitor`);
+                    if (Object.keys(watchList).length > 0) {
+                        monitorList.innerHTML = "";
+                        for (let user in watchList) {
+                            let monitorLabel = document.createElement("span");
+                            const { stu_no, stu_name } = watchList[user];
+                            monitorLabel.innerText = `${stu_no}${stu_name}`;
+                            monitorList.appendChild(monitorLabel);
                         }
                     } else {
-                        recordState.innerText = "未录制";
-                        recordState.style.color = "black";
+                        monitorList = document.getElementById(`${stu_no}-monitor`);
+                        monitorList.innerText = "/";
                     }
-                }
-                let monitorList = document.getElementById(`${stu_no}-monitor`);
-                if (Object.keys(watchList).length > 0) {
-                    monitorList.innerHTML = "";
-                    for (let user in watchList) {
-                        let monitorLabel = document.createElement("span");
-                        const {stu_no, stu_name} = watchList[user];
-                        monitorLabel.innerText = `${stu_no}${stu_name}`;
-                        monitorList.appendChild(monitorLabel);
-                    }
-                } else {
-                    monitorList = document.getElementById(`${stu_no}-monitor`);
-                    monitorList.innerText = "/";
-                }
 
+                });
             });
-
         });
 
         const sendEmit = async (type, data, target = '') => {
@@ -184,7 +238,7 @@
         document.getElementById('disable-btn').onclick = async () => {
             let result = prompt('请输入要取消登录权限用户的学号：');
             try {
-                const response = await axios.post('/disable', {id: result});
+                const response = await axios.post('/disable', { id: result });
                 if (response.data['code'] !== 0) {
                     alert(response.data['message']);
                 }
@@ -192,6 +246,30 @@
                 console.error(error);
             }
         };
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const checkboxes = document.querySelectorAll('.forbid-exam, .allow-new-ip');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function () {
+                const stuId = this.getAttribute('data-stu');
+                let type, op;
+                if (this.classList.contains('forbid-exam')) {
+                    type = 'exam';
+                    op = this.checked ? 'disable' : 'enable';
+                } else {
+                    type = 'newip';
+                    op = this.checked ? 'enable' : 'disable';
+                }
+                axios.post('/manage', {
+                    srcId: stuId,
+                    type: type,
+                    op: op
+                }).catch(error => {
+                    console.error('An error occurred:', error);
+                });
+            });
+        });
     });
 
 </script>

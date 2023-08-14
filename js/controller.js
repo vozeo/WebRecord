@@ -108,7 +108,7 @@ const establishConnection = (type) => {
         peer.reconnect();
     });
     if (RecordList[type].peer) {
-        RecordList[type].peer.destroy()
+        RecordList[type].peer.destroy();
     }
     RecordList[type].peer = peer;
 }
@@ -216,13 +216,16 @@ const recordButtonClick = (type) => {
                         document.getElementById(`${type}-record-btn`).click();
                     }
                 });
+                /*
                 const permission = await navigator.permissions.query({
                     name: 'window-placement'
                 });
                 if (permission.state !== 'granted') {
                     alert('未选择同意“窗口管理”权限，请同意“窗口管理”权限！');
                     return;
-                } else if (type === 'screen') {
+                } else 
+                */
+                if (type === 'screen') {
                     const tracks = video.getTracks();
                     const hasShared = tracks.some(track => track.label.startsWith('screen'));
                     if (!hasShared) {
