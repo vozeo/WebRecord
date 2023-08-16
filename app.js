@@ -16,7 +16,7 @@ const server = https.createServer({
 
 app.engine('html', require('express-art-template'));
 app.set('view options', {
-    debug: true
+    debug: false
 });
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'html');
@@ -456,17 +456,17 @@ app.post('/password', auth, async (req, res) => {
         });
     }
 
-    if (req.body.newPassword.match(/[^\w\-*=#$%!]+/)) {
+    if (req.body.newPassword.match(/[^\w\-*=#$%!@.]+/)) {
         await addLog(user, userIP, "illegal_character", "修改密码失败: 包含了非法字符");
         return res.send({
-            code: -4, message: "密码不能包含除数字、小写字母、大写字母或 * = - _ # $ % ! 字符以外的其他字符!"
+            code: -4, message: "密码不能包含除数字、小写字母、大写字母或 * = - _ # $ % ! . @ 字符以外的其他字符!"
         });
     }
 
     if (isSimplePwd(req.body.newPassword)) {
         await addLog(user, userIP, "simple_password", "修改密码失败: 密码不够复杂");
         return res.send({
-            code: -5, message: "新密码需包含数字、小写字母、大写字母、其它符号 * = - _ # $ % ! 这四种中的至少三种，且长度大于等于12位！"
+            code: -5, message: "新密码需包含数字、小写字母、大写字母、其它符号 * = - _ # $ % ! . @ 这四种中的至少三种，且长度大于等于12位！"
         });
     }
 
