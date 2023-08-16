@@ -95,7 +95,7 @@ const establishConnection = (type) => {
             'iceServers': [{ url: 'stun:stun.l.google.com:19302' }, {
                 url: `turn:${document.domain}:${NetworkConfig.turnServerPort}`,
                 username: NetworkConfig.turnServerUsername,
-                credential: NetworkConfig.turnServerCredential,
+                credential: NetworkConfig.turnServerCredential
             }],
         }
     });
@@ -193,7 +193,7 @@ const endRecord = (type) => {
     });
 }
 
-let IntervalId;
+// let IntervalId;
 const sendScreenNumber = async () => {
     const screens = await window.getScreenDetails();
     Socket.emit('screen', SessionUser.stu_no, screens.screens.length);
@@ -234,7 +234,7 @@ const recordButtonClick = (type) => {
                         return;
                     }
                 }
-                IntervalId = setInterval(sendScreenNumber, VideoConfig.sliceTime);
+                // IntervalId = setInterval(sendScreenNumber, VideoConfig.sliceTime);
                 startRecord(video, type);
                 establishConnection(type);
             }, (error) => {
@@ -247,7 +247,7 @@ const recordButtonClick = (type) => {
         case 'pause':
         case 'start':
             RecordList[type].state = 'end';
-            clearInterval(IntervalId);
+            // clearInterval(IntervalId);
             endRecord(type);
             break;
     }
