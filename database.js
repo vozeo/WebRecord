@@ -1,10 +1,11 @@
-const mysql = require('mysql')
+const mysql = require('mysql');
 const util = require('util');
-const databaseConfig = {
-    ...require('./config').databaseConfig,
-    charset: 'utf8'
-};
+const { databaseConfig } = require('./config');
 const pool = mysql.createPool(databaseConfig);
+
+pool.on('connection', function (connection) {
+    connection.query('SET NAMES utf8mb4');
+});
 
 const database = async (sql, sqlParams = []) => {
     let connection;
