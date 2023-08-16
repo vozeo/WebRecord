@@ -1,6 +1,9 @@
 const mysql = require('mysql')
 const util = require('util');
-const { databaseConfig } = require('./config')
+const databaseConfig = {
+    ...require('./config').databaseConfig,
+    charset: 'utf8'
+};
 const pool = mysql.createPool(databaseConfig);
 
 const database = async (sql, sqlParams = []) => {

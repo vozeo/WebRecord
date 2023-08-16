@@ -38,7 +38,7 @@ const getTime = (date = new Date()) => `${date.toLocaleString('zh-CN', {
 }).replaceAll(':', '-')}`;
 
 const isSimplePwd = (password) => {
-    if (password.length < 12) {
+    if (password.length < 8) {
         return true;
     }
     return /[a-z]+/.test(password) + /[A-Z]+/.test(password) + /[0-9]+/.test(password) + /[^a-zA-Z0-9]+/.test(password) < 3;
@@ -466,7 +466,7 @@ app.post('/password', auth, async (req, res) => {
     if (isSimplePwd(req.body.newPassword)) {
         await addLog(user, userIP, "simple_password", "修改密码失败: 密码不够复杂");
         return res.send({
-            code: -5, message: "新密码需包含数字、小写字母、大写字母、其它符号 * = - _ # $ % ! . @ 这四种中的至少三种，且长度大于等于12位！"
+            code: -5, message: "新密码需包含数字、小写字母、大写字母、其它符号 * = - _ # $ % ! . @ 这四种中的至少三种，且长度大于等于8位！"
         });
     }
 
