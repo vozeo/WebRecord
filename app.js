@@ -372,7 +372,7 @@ app.get('/video/:name', auth, opAuth, function (req, res) {
 });
 
 app.get('/stulist', auth, opAuth, async (req, res) => {
-    const stulist = databaseConfig === 'exam' ? await getMonitorExamStuList(databaseConfig.term, databaseConfig.cno, databaseConfig.eno, req.session.user.stu_no, databaseConfig.type) : await getMonitorStuList(req.session.user.stu_no, databaseConfig.type);
+    const stulist = databaseConfig.stulist === 'exam' ? await getMonitorExamStuList(databaseConfig.term, databaseConfig.cno, databaseConfig.eno, req.session.user.stu_no, databaseConfig.type) : await getMonitorStuList(req.session.user.stu_no, databaseConfig.type);
     res.send({ stulist: stulist });
 });
 
