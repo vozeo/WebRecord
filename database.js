@@ -59,9 +59,9 @@ const getMonitorStuList = async (monitorId, status) => {
 
 // call proc_exam_student_management ("2022/2023/2", "100084", "04", "1111", "2307101", "exam", "disable");
 // call proc_exam_student_management ("2022/2023/2", "100084", "04", "1111", "2307101", "newip", "enable");
-const examStudentManagement = async (term, cno, eno, mno, sno, type, op) => {
-    const sql = "CALL proc_exam_student_management(?, ?, ?, ?, ?, ?, ?)";
-    await database(sql, [term, cno, eno, mno, sno, type, op]);
+const examStudentManagement = async (term, cno, eno, mno, sno, type, op, is_end) => {
+    const sql = "CALL proc_exam_student_management(?, ?, ?, ?, ?, ?, ?, ?)";
+    await database(sql, [term, cno, eno, mno, sno, type, op, is_end]);
 };
 
 // call proc_get_monitor_exam_stulist("2022/2023/2", "100084", "04", "1111", "valid");

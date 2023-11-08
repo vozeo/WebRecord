@@ -25,7 +25,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '/')));
 app.use(session({
     secret: serverConfig.sessionSecret, resave: false, saveUninitialized: true, cookie: {
-        secure: true, maxAge: 1000 * 60 * 60 * 24
+        secure: true, httpOnly: true
     }
 }));
 
@@ -70,6 +70,19 @@ let AllUsers = {};
     }
     console.log(getTime() + ' 服务器初始化完成');
 })();
+
+const targetTime = new Date(databaseConfig.endtime).getTime();
+function checkTime() {
+    const now = Date.now();
+    if (now >= targetTime) {
+        for (let user in AllUsers) {
+            io.emit('disable', user.stu_no);
+        }
+        clearInterval(endInterval);
+    }
+}
+const endInterval = setInterval(checkTime, 1000);
+
 
 function handleInterrupt(user) {
     const currentTime = Date.now(); 
@@ -523,6 +536,28 @@ app.get('/logout', auth, async (req, res) => {
     await addLog(user, userIP, "logout", "退出登录");
     req.session.user = null;
     res.redirect('/');
+});
+
+let scheduledDestroy = {};
+
+app.post('/pageOpened', (req, res) => {
+    req.session.pageCount = (req.session.pageCount || 0) + 1;
+    if (scheduledDestroy[req.sessionID]) {
+        clearTimeout(scheduledDestroy[req.sessionID]);
+        delete scheduledDestroy[req.sessionID];
+    }
+    res.sendStatus(200);
+});
+
+app.post('/pageClosed', (req, res) => {
+    req.session.pageCount--;
+    if (req.session.pageCount <= 0) {
+        scheduledDestroy[req.sessionID] = setTimeout(() => {
+            req.session.destroy();
+            delete scheduledDestroy[req.sessionID];
+        }, 3000);
+    }
+    res.sendStatus(200);
 });
 
 server.listen(networkConfig.socketPort);

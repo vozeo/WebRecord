@@ -62,6 +62,18 @@
     <script src="../node_modules/startbootstrap-new-age/dist/js/scripts.js"></script>
     <script src="../node_modules/axios/dist/axios.min.js"></script>
     <script src="../node_modules/socket.io/client-dist/socket.io.min.js"></script>
+    <script lang="text/javascript">
+        window.addEventListener('DOMContentLoaded', function () {
+            fetch('/pageOpened', {
+                method: 'POST'
+            });
+        });
+        window.addEventListener('beforeunload', function () {
+            const url = '/pageClosed';
+            const data = null;
+            navigator.sendBeacon(url, data);
+        });
+    </script>
     {{ block 'script'}}{{ /block }}
 </body>
 

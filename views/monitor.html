@@ -35,6 +35,7 @@
                     <th scope="col">累计时长</th>
                     <th scope="col">禁止参加考试</th>
                     <th scope="col">允许新IP登录</th>
+                    <th scope="col">交卷</th>
                     <th scope="col">监考</th>
                 </tr>
             </thead>
@@ -54,6 +55,7 @@
                     <td class="accumulated-duration" id="{{$value.sno}}-accumulated-duration"></td>
                     <td><input type="checkbox" data-stu="{{ $value.sno }}" class="forbid-exam"></td>
                     <td><input type="checkbox" data-stu="{{ $value.sno }}" class="allow-new-ip"></td>
+                    <td class="is-end" id="{{ $value.sno }}-is-end">/</td>
                     <td id="{{$value.sno}}-monitor">/</td>
                 </tr>
                 {{/each}}
@@ -132,6 +134,8 @@
                         allowNewIPCheckbox.checked = user.enable_newip === '1';
                     }
                 }
+                const isEndState = document.getElementById(`${user.sno}-is-end`);
+                isEndState.innerText = user.is_end === '1' ? '已交卷' : '/';
             });
             socket.on('state', data => {
                 Object.values(data).filter(user => user.stu_userlevel === '0' && user.stu_no in userList).forEach(user => {
