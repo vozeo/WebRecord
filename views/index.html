@@ -1,0 +1,36 @@
+{{extend './template.html'}}
+
+{{block 'title'}}主页{{/block}}
+
+{{block 'content'}}
+<section id="features">
+    <h1 id="sentence" class="mt-5 mb-3 text-center"></h1>
+    <p id="info" class="me-5" style="text-align: right;"></p>
+    <div></div>
+    {{ if sessionUser }}
+    <div class="container-fluid text-center p-5">
+        <a style="display: none;" type="button" class="btn btn-success btn-lg m-5" href="/recordtest">测试设备</a>
+        {{ if sessionUser.stu_userlevel !== '1'}}
+        <a type="button" class="btn btn-warning btn-lg" href="/record">进入录制</a>
+        {{ else }}
+        <a type="button" class="btn btn-warning btn-lg" href="/monitor">进入监控</a>
+        <a style="display: none;" type="button" class="btn btn-info btn-lg" href="/history" target="_blank">历史视频</a>
+        {{ /if }}
+    </div>
+    {{ /if }}
+</section>
+{{/block}}
+
+{{block 'script'}}
+<script src="https://sdk.jinrishici.com/v2/browser/jinrishici.js" charset="utf-8"></script>
+<script type="text/javascript">
+    const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+    jinrishici.load(result => {
+        const sentence = document.querySelector("#sentence");
+        const info = document.querySelector("#info");
+        sentence.innerHTML = result.data.content
+        info.innerHTML = `——【${result.data.origin.dynasty}】${result.data.origin.author}《${result.data.origin.title}》`
+        sentence.style.color = info.style.color = randomColor;
+    });
+</script>
+{{/block}}

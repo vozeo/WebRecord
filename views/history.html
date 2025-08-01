@@ -1,0 +1,55 @@
+{{extend './template.html'}}
+
+{{block 'title'}}历史视频{{/block}}
+
+{{block 'content'}}
+<section id="features">
+    <div class="col-10 container-fluid text-center">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">序号</th>
+                    <th scope="col">年级</th>
+                    <th scope="col">学号</th>
+                    <th scope="col">姓名</th>
+                    <th scope="col">专业</th>
+                    <th scope="col">历史视频</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                {{each user}}
+                <tr>
+                    <td>{{$index + 1}}</td>
+                    <td>{{$value.stu_grade}}</td>
+                    <td>{{$value.stu_no}}</td>
+                    <td>{{$value.stu_name}}</td>
+                    <td>{{$value.stu_class_sname}}</td>
+                    <td id="{{$value.stu_no}}"></td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</section>
+{{/block}}
+
+{{ block 'script' }}
+<script>
+    axios.get('/file').then(res => {
+        console.log(res.data)
+        let records = res.data;
+        for (let id in records) {
+            let cell = document.getElementById(id);
+            cell.innerHTML = '';
+            for (let videoId of records[id]) {
+                let link = document.createElement('a');
+                link.href = `/video/${videoId}`;
+                link.target = '_blank';
+                link.innerText = videoId;
+                cell.append(link, document.createElement('br'));
+            }
+        }
+    });
+</script>
+
+{{ /block }}

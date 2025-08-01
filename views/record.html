@@ -1,0 +1,39 @@
+{{extend './template.html'}}
+
+{{block 'title'}}考试录制{{/block}}
+
+{{block 'content'}}
+<section id="features">
+
+    <div class="container-fluid text-center p-5">
+        <div class="alert alert-warning">
+            服务器连接状态：
+            <button id="online-state-btn" class="btn btn-outline-dark">未连接</button>
+        </div>
+        <div id="screen-state" class="alert alert-info" style="display: none;">
+            屏幕录制状态：
+            <button id="screen-state-btn" class="btn btn-outline-dark">未录制</button>
+        </div>
+        <div id="camera-state" class="alert alert-success" style="display: none;">
+            摄像头录制状态：
+            <button id="camera-state-btn" class="btn btn-outline-dark">未录制</button>
+        </div>
+    </div>
+
+    <div id="screen-container" class="container-fluid text-center p-3" style="display: none;">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-primary btn-lg" id="screen-record-btn">开始屏幕录制</button>
+        </div>
+    </div>
+    <div id="camera-container" class="container-fluid text-center p-3" style="display: none;">
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-primary btn-lg" id="camera-record-btn">开始摄像头录制</button>
+        </div>
+    </div>
+</section>
+{{/block}}
+
+{{block 'script'}}
+<script src="../node_modules/peerjs/dist/peerjs.min.js"></script>
+<script src="../js/record.js"></script>
+{{/block}}
