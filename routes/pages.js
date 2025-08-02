@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const { auth, opAuth, noAuth } = require('../middleware/auth');
 const { databaseConfig } = require('../config');
-const { getMonitorStuList, getMonitorExamStuList } = require('../database');
+const { getMonitorStuList, getMonitorExamStuList } = require('../services/database');
 const { getAllUsersState } = require('../services/userManager');
 
 const router = express.Router();

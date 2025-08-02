@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 const { auth, opAuth, getUser } = require('../middleware/auth');
 const { videoConfig, networkConfig, serverConfig, databaseConfig } = require('../config');
-const { addLog, getUserById, updateById, getMonitorStuList, examStudentManagement, getMonitorExamStuList } = require('../database');
-const { isSimplePwd, cryptPwd, formatFileSize } = require('../utils');
+const { addLog, getUserById, updateById, getMonitorStuList, examStudentManagement, getMonitorExamStuList } = require('../services/database');
+const { isSimplePwd, cryptPwd, formatFileSize } = require('../services/utils');
 const { getAllUsersState, removeUser } = require('../services/userManager');
 
 const router = express.Router();

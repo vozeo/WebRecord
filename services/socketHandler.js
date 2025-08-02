@@ -1,7 +1,7 @@
 const fs = require('fs');
-const { addLog } = require('../database');
+const { addLog } = require('./database');
 const { serverConfig } = require('../config');
-const { handleInterrupt, updateAccumulatedDuration } = require('../utils');
+const { handleInterrupt, updateAccumulatedDuration } = require('./utils');
 const { getAllUsersState, getUserState, updateUserState } = require('./userManager');
 
 // Socket状态管理

@@ -1,7 +1,7 @@
 const fs = require('fs');
-const { getAllUsers } = require('../database');
+const { getAllUsers } = require('./database');
 const { serverConfig, databaseConfig } = require('../config');
-const { getTime } = require('../utils');
+const { getTime } = require('./utils');
 
 // 全局用户状态管理
 let AllUsers = {};

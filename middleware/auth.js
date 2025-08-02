@@ -1,5 +1,5 @@
-const { getUserById } = require('../database');
-const { cryptPwd } = require('../utils');
+const { getUserById } = require('../services/database');
+const { cryptPwd } = require('../services/utils');
 
 /**
  * 获取当前会话用户

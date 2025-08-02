@@ -1,7 +1,7 @@
 const express = require('express');
 const { auth, noAuth, getUser } = require('../middleware/auth');
-const { addLog, getUserById, updateById } = require('../database');
-const { isSimplePwd, cryptPwd } = require('../utils');
+const { addLog, getUserById, updateById } = require('../services/database');
+const { isSimplePwd, cryptPwd } = require('../services/utils');
 
 const router = express.Router();
 
