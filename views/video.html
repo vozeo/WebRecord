@@ -1,64 +1,349 @@
-{{extend './template.html'}}
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>实时视频</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-connecting {
+            background: #ffc107;
+            color: #000;
+        }
+        .status-connected {
+            background: #28a745;
+            color: #fff;
+        }
+        .status-error {
+            background: #dc3545;
+            color: #fff;
+        }
+        .control-panel {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body id="page-top">
+    <div class="container-fluid p-3">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h3 id="video-title">实时视频监控</h3>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="video-container">
+                    <video id="remoteVideo" autoplay muted class="w-100" style="min-height: 400px; max-height: 70vh;"></video>
+                    <div id="status-indicator" class="status-indicator status-connecting">连接中...</div>
+                </div>
+                <div class="control-panel text-center">
+                    <button id="reconnect-btn" class="btn btn-primary" onclick="reconnect()" style="display: none;">重新连接</button>
+                    <button id="close-btn" class="btn btn-secondary" onclick="closeWindow()">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-{{block 'title'}}{{id}}{{name}}{{typeName}}{{/block}}
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/public/js/template.js"></script>
+    <script>
+        // 从URL获取参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentId = urlParams.get('id');
+        const streamType = urlParams.get('type');
 
-{{block 'head'}}
-<style>
-    video {
-        position: absolute;
-        top: 72px;
-        bottom: 40px;
-        height: calc(100% - 112px);
-        width: 100%;
-    }
-</style>
-{{/block}}
+        let peer = null;
+        let socket = null;
+        let networkConfig = null;
+        let sessionUser = null;
+        let connectionAttempts = 0;
+        const maxConnectionAttempts = 3;
 
-{{block 'content'}}
+        // 更新页面标题
+        if (studentId && streamType) {
+            document.getElementById('video-title').textContent =
+                `学号: ${studentId} - ${streamType === 'screen' ? '屏幕' : '摄像头'}监控`;
+        }
 
-<video id="player" controls autoplay muted></video>
+        // 状态更新函数
+        function updateStatus(status, message) {
+            const indicator = document.getElementById('status-indicator');
+            const reconnectBtn = document.getElementById('reconnect-btn');
 
-{{/block}}
+            indicator.className = `status-indicator status-${status}`;
+            indicator.textContent = message;
 
-{{block 'top'}}
-<span class="navbar-brand fw-bold" href="/">{{id}} {{name}} {{typeName}}</span>
-{{/block}}
+            if (status === 'error') {
+                reconnectBtn.style.display = 'inline-block';
+            } else {
+                reconnectBtn.style.display = 'none';
+            }
+        }
 
-{{block 'script'}}
-<script src="../node_modules/peerjs/dist/peerjs.min.js"></script>
-<script type="text/javascript">
-    axios.get('/information').then((res) => {
-        const {networkConfig, sessionUser} = res.data;
-        let url = new URL(window.location.href);
-        let params = new URLSearchParams(url.search);
-        const {id, type, device} = Object.fromEntries(params.entries());
-        const socket = io(`https://${document.domain}:${networkConfig.socketPort}`, {rejectUnauthorized: false});
-        socket.on("connect", () => {
-            socket.emit('watch', sessionUser.stu_no, id);
-        });
-        const peerId = id + type + device;
-        console.log(peerId)
-        const peer = new Peer({
-            host: document.domain,
-            port: networkConfig.socketPort,
-            path: "/webrtc",
-            secure: true,
-            config: {
-                'iceServers': [{url: 'stun:stun.l.google.com:19302'}, {
-                    url: `turn:${document.domain}:${networkConfig.turnServerPort}`,
-                    username: networkConfig.turnServerUsername,
-                    credential: networkConfig.turnServerCredential,
-                }],
+        // 初始化函数
+        async function initialize() {
+            try {
+                console.log('🎥 初始化实时监控页面...');
+
+                // 获取配置信息
+                const response = await fetch('/api/information');
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || '获取配置信息失败');
+                }
+
+                networkConfig = data.data.networkConfig;
+                sessionUser = data.data.sessionUser;
+
+                if (!sessionUser || sessionUser.stu_userlevel < 1) {
+                    throw new Error('需要管理员权限才能查看实时视频');
+                }
+
+                console.log('✅ 配置信息获取成功');
+
+                // 建立连接
+                await setupConnections();
+
+            } catch (error) {
+                console.error('❌ 初始化失败:', error);
+                const message = error.response?.data?.message || error.message || '初始化失败';
+                updateStatus('error', `初始化失败: ${message}`);
+                
+                // 如果有template系统，也显示错误提示
+                if (window.templateSystem && window.templateSystem.showError) {
+                    window.templateSystem.showError(`视频监控初始化失败: ${message}`);
+                }
+            }
+        }
+
+        // 建立连接
+        async function setupConnections() {
+            try {
+                updateStatus('connecting', '正在连接...');
+
+                // 建立Socket连接
+                await setupSocketConnection();
+
+                // 建立WebRTC连接
+                await setupWebRTCConnection();
+
+            } catch (error) {
+                console.error('❌ 连接建立失败:', error);
+                const message = error.response?.data?.message || error.message || '连接失败';
+                updateStatus('error', `连接失败: ${message}`);
+                
+                if (window.templateSystem && window.templateSystem.showError) {
+                    window.templateSystem.showError(`无法建立连接: ${message}`);
+                }
+                throw error;
+            }
+        }
+
+        // 建立Socket连接
+        function setupSocketConnection() {
+            return new Promise((resolve, reject) => {
+                const socketUrl = `https://${window.location.hostname}:${networkConfig.socketPort}`;
+
+                socket = io(socketUrl, {
+                    rejectUnauthorized: false,
+                    timeout: 20000,
+                    forceNew: true,
+                    transports: ['polling', 'websocket'],
+                    upgrade: true,
+                    withCredentials: true
+                });
+
+                socket.on('connect', () => {
+                    console.log('✅ Socket连接成功');
+
+                    // 发送监控请求
+                    socket.emit('watch', sessionUser.stu_no, studentId);
+                    resolve();
+                });
+
+                socket.on('connect_error', (error) => {
+                    console.error('❌ Socket连接失败:', error);
+                    const message = error.message || 'Socket连接失败';
+                    reject(new Error(message));
+                });
+
+                socket.on('disconnect', (reason) => {
+                    console.log('❌ Socket连接断开:', reason);
+                    updateStatus('error', 'Socket连接断开');
+                });
+            });
+        }
+
+        // 建立WebRTC连接
+        function setupWebRTCConnection() {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 创建Peer连接
+                    const peerId = `monitor-${sessionUser.stu_no}-${Date.now()}`;
+
+                    peer = new Peer(peerId, {
+                        host: window.location.hostname,
+                        port: networkConfig.socketPort,
+                        path: "/webrtc",
+                        secure: true,
+                        config: {
+                            'iceServers': [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                {
+                                    urls: `turn:${window.location.hostname}:${networkConfig.turnServerPort}`,
+                                    username: networkConfig.turnServerUsername,
+                                    credential: networkConfig.turnServerCredential
+                                }
+                            ]
+                        }
+                    });
+
+                    peer.on('open', (id) => {
+                        console.log('✅ Peer连接建立成功, ID:', id);
+
+                        // 尝试连接到学生端
+                        connectToStudent();
+                        resolve();
+                    });
+
+                    peer.on('error', (error) => {
+                        console.error('❌ Peer连接错误:', error);
+                        reject(new Error(`Peer连接失败: ${error.message}`));
+                    });
+
+                    peer.on('call', (call) => {
+                        console.log('📞 收到来电');
+                        call.answer(); // 接听来电
+
+                        call.on('stream', (remoteStream) => {
+                            console.log('🎥 收到远程视频流');
+                            const video = document.getElementById('remoteVideo');
+                            video.srcObject = remoteStream;
+                            updateStatus('connected', '连接成功');
+                        });
+
+                        call.on('error', (error) => {
+                            console.error('❌ 通话错误:', error);
+                            updateStatus('error', `通话错误: ${error.message}`);
+                        });
+
+                        call.on('close', () => {
+                            console.log('📞 通话结束');
+                            updateStatus('error', '连接已断开');
+                        });
+                    });
+
+                } catch (error) {
+                    console.error('❌ WebRTC初始化失败:', error);
+                    reject(error);
+                }
+            });
+        }
+
+        // 连接到学生端
+        function connectToStudent() {
+            try {
+                // 构建学生端的Peer ID
+                // 根据旧代码，学生端的ID格式是: 学号 + 类型 + 设备ID
+                // 我们需要尝试连接到学生端
+
+                console.log('🔍 尝试连接到学生端...');
+
+                // 由于我们不知道确切的设备ID，我们需要通过Socket通知学生端建立连接
+                // 或者尝试一些常见的连接方式
+
+                setTimeout(() => {
+                    // 如果一段时间后还没有连接成功，显示错误
+                    if (document.getElementById('status-indicator').textContent === '正在连接...') {
+                        updateStatus('error', '无法连接到学生端，请确保学生正在录制');
+                    }
+                }, 10000);
+
+            } catch (error) {
+                console.error('❌ 连接学生端失败:', error);
+                updateStatus('error', `连接失败: ${error.message}`);
+            }
+        }
+
+        // 重新连接
+        async function reconnect() {
+            connectionAttempts++;
+
+            if (connectionAttempts > maxConnectionAttempts) {
+                updateStatus('error', '连接失败次数过多，请稍后重试');
+                return;
+            }
+
+            console.log(`🔄 尝试重新连接 (${connectionAttempts}/${maxConnectionAttempts})`);
+
+            // 清理现有连接
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+
+            // 重新建立连接
+            try {
+                await setupConnections();
+            } catch (error) {
+                console.error('❌ 重新连接失败:', error);
+                const message = error.response?.data?.message || error.message || '重新连接失败';
+                updateStatus('error', `重新连接失败: ${message}`);
+                
+                if (window.templateSystem && window.templateSystem.showError) {
+                    window.templateSystem.showError(`重新连接失败: ${message}`);
+                }
+            }
+        }
+
+        // 关闭窗口
+        function closeWindow() {
+            if (peer) {
+                peer.destroy();
+            }
+            if (socket) {
+                socket.disconnect();
+            }
+            window.close();
+        }
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            if (peer) {
+                peer.destroy();
+            }
+            if (socket) {
+                socket.disconnect();
             }
         });
-        peer.on('open', () => peer.connect(peerId));
-        peer.on('call', (call) => {
-            call.on('stream', (stream) => {
-                document.getElementById("player").srcObject = stream;
-                document.getElementById('player').play();
-            });
-            call.answer(null);
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🎥 实时监控页面加载完成');
+            initialize();
         });
-    });
-</script>
-{{/block}}
+    </script>
+</body>
+</html>

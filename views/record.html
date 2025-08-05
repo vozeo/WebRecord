@@ -1,39 +1,152 @@
-{{extend './template.html'}}
+<!DOCTYPE html>
+<html lang="zh-cn">
 
-{{block 'title'}}考试录制{{/block}}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>录制界面</title>
+</head>
 
-{{block 'content'}}
-<section id="features">
+<body id="page-top">
+    <!-- 导航栏和页脚将通过template.js自动添加 -->
+    
+    <section id="features">
+        <div class="container-fluid text-center px-5 py-3">
+            <h2 class="mb-4">录制控制台</h2>
+            
+            <div class="row justify-content-center mb-4">
+                <div class="col-md-6">
+                    <div class="alert alert-info">
+                        连接状态：<button id="online-state-btn" class="btn btn-outline-dark btn-sm">未连接</button>
+                    </div>
+                </div>
+            </div>
 
-    <div class="container-fluid text-center p-5">
-        <div class="alert alert-warning">
-            服务器连接状态：
-            <button id="online-state-btn" class="btn btn-outline-dark">未连接</button>
-        </div>
-        <div id="screen-state" class="alert alert-info" style="display: none;">
-            屏幕录制状态：
-            <button id="screen-state-btn" class="btn btn-outline-dark">未录制</button>
-        </div>
-        <div id="camera-state" class="alert alert-success" style="display: none;">
-            摄像头录制状态：
-            <button id="camera-state-btn" class="btn btn-outline-dark">未录制</button>
-        </div>
-    </div>
+            <div class="row justify-content-center">
+                <div class="col-md-6" id="screen-container" style="display:none;">
+                    <div class="card" id="screen-state" style="display:none;">
+                        <div class="card-body">
+                            <h5 class="card-title">屏幕录制</h5>
+                            <button id="screen-record-btn" class="btn btn-primary btn-lg me-2">开始屏幕录制</button>
+                            <div class="mt-2">
+                                <small id="screen-state-btn" class="text-muted">未录制</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    <div id="screen-container" class="container-fluid text-center p-3" style="display: none;">
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-primary btn-lg" id="screen-record-btn">开始屏幕录制</button>
+                <div class="col-md-6" id="camera-container" style="display:none;">
+                    <div class="card" id="camera-state" style="display:none;">
+                        <div class="card-body">
+                            <h5 class="card-title">摄像头录制</h5>
+                            <button id="camera-record-btn" class="btn btn-primary btn-lg me-2">开始摄像头录制</button>
+                            <div class="mt-2">
+                                <small id="camera-state-btn" class="text-muted">未录制</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-    <div id="camera-container" class="container-fluid text-center p-3" style="display: none;">
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-primary btn-lg" id="camera-record-btn">开始摄像头录制</button>
-        </div>
-    </div>
-</section>
-{{/block}}
+    </section>
 
-{{block 'script'}}
-<script src="../node_modules/peerjs/dist/peerjs.min.js"></script>
-<script src="../js/record.js"></script>
-{{/block}}
+    <script src="/public/js/template.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 等待模板系统初始化
+            await new Promise(resolve => {
+                const checkTemplate = () => {
+                    if (window.templateSystem && window.templateSystem.isInitialized) {
+                        resolve();
+                    } else {
+                        setTimeout(checkTemplate, 100);
+                    }
+                };
+                checkTemplate();
+            });
+
+            // 等待axios加载完成后再加载controller.js
+            await new Promise(resolve => {
+                const checkAxios = () => {
+                    if (typeof axios !== 'undefined') {
+                        resolve();
+                    } else {
+                        setTimeout(checkAxios, 100);
+                    }
+                };
+                checkAxios();
+            });
+
+            // 检查权限：所有已登录用户都可以录制
+            if (window.logger) {
+                window.logger.info('RecordPage', '检查录制权限...', window.templateSystem.sessionUser);
+            }
+
+            if (!window.templateSystem.sessionUser) {
+                if (window.logger) {
+                    window.logger.error('RecordPage', '用户未登录，拒绝访问');
+                }
+                window.templateSystem.showError('访问被拒绝：请先登录');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+                return;
+            }
+
+            if (window.logger) {
+                window.logger.info('RecordPage', '权限检查通过，用户可以录制');
+            }
+
+            // 先加载PeerJS库
+            const peerScript = document.createElement('script');
+            peerScript.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+            peerScript.onload = () => {
+                if (window.logger) {
+                    window.logger.debug('RecordPage', 'PeerJS库加载完成');
+                }
+
+                // 然后加载Socket.IO
+                const socketScript = document.createElement('script');
+                socketScript.src = '/socket.io/socket.io.js';
+                socketScript.onload = () => {
+                    if (window.logger) {
+                        window.logger.debug('RecordPage', 'Socket.IO库加载完成');
+                    }
+
+                    // 最后加载record.js
+                    const recordScript = document.createElement('script');
+                    recordScript.src = '/public/js/record.js';
+                    recordScript.onload = () => {
+                        if (window.logger) {
+                            window.logger.info('RecordPage', 'Record.js加载完成，录制功能已就绪');
+                        }
+                        // record.js会自动初始化Socket连接和录制功能
+                    };
+                    recordScript.onerror = () => {
+                        if (window.logger) {
+                            window.logger.error('RecordPage', 'Record.js加载失败');
+                        }
+                        window.templateSystem.showError('录制功能加载失败，请刷新页面重试');
+                    };
+                    document.head.appendChild(recordScript);
+                };
+                socketScript.onerror = () => {
+                    if (window.logger) {
+                        window.logger.error('RecordPage', 'Socket.IO库加载失败');
+                    }
+                    window.templateSystem.showError('Socket.IO库加载失败，请刷新页面重试');
+                };
+                document.head.appendChild(socketScript);
+            };
+            peerScript.onerror = () => {
+                if (window.logger) {
+                    window.logger.error('RecordPage', 'PeerJS库加载失败');
+                }
+                window.templateSystem.showError('PeerJS库加载失败，请刷新页面重试');
+            };
+            document.head.appendChild(peerScript);
+        });
+    </script>
+</body>
+
+</html>

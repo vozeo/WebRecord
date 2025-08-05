@@ -1,281 +1,889 @@
-{{extend './template.html'}}
+<!DOCTYPE html>
+<html lang="zh-cn">
 
-{{block 'title'}}监控界面{{/block}}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>监控界面</title>
+</head>
 
-{{block 'content'}}
-<section id="features">
-    <div class="container-fluid text-center px-5 py-3">
-        <div class="alert alert-warning">
-            监控端连接状态：
-            <button id="online-state-btn" class="btn btn-outline-dark">未连接</button>
+<body id="page-top">
+    <!-- 导航栏和页脚将通过template.js自动添加 -->
+    
+    <section id="features">
+        <div class="container-fluid text-center px-5 py-3">
+            <div class="alert alert-warning">
+                监控端连接状态：
+                <button id="online-state-btn" class="btn btn-outline-dark">未连接</button>
+            </div>
+        </div>
+
+        <!-- 系统状态显示区域 -->
+        <div class="container-fluid px-5 py-2">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">系统状态</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-6">
+                                    <small class="text-muted">服务器运行时间</small>
+                                    <div id="server-uptime" class="fw-bold">--</div>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">内存使用</small>
+                                    <div id="memory-usage" class="fw-bold">--</div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-4">
+                                    <small class="text-muted">在线用户</small>
+                                    <div id="online-users" class="fw-bold text-success">--</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">录制中</small>
+                                    <div id="recording-users" class="fw-bold text-warning">--</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">总设备数</small>
+                                    <div id="total-devices" class="fw-bold text-info">--</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">在线监考员</h6>
+                        </div>
+                        <div class="card-body" style="max-height: 150px; overflow-y: auto;">
+                            <div id="supervisors-list">
+                                <small class="text-muted">暂无在线监考员</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container-fluid text-center mb-4">
+            <button class="btn btn-info" id="start-btn">全体开始录制</button>
+            <button class="btn btn-danger" id="finish-btn">全体停止录制</button>
+            <button class="btn btn-success" id="notice-btn">发送通知</button>
+            <button class="btn btn-warning" id="user-status-btn">用户管理</button>
+            <button class="btn btn-warning" id="file-monitor-btn">文件管理</button>
+            <button class="btn btn-primary" id="live-monitor-btn">实时监控</button>
+        </div>
+
+        <!-- 考试信息显示区域 -->
+        <div class="container-fluid text-center mb-3" id="exam-info" style="display: none;">
+            <div class="alert alert-info">
+                <strong>考试信息：</strong>
+                <span id="exam-details"></span>
+            </div>
+        </div>
+
+        <div class="col-10 container-fluid text-center">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">序号</th>
+                        <th scope="col">学号</th>
+                        <th scope="col">姓名</th>
+                        <th scope="col" id="exam-info-col" style="display: none;">考试信息</th>
+                        <th scope="col">在线数量</th>
+                        <th id='screen-record' scope="col">屏幕录制</th>
+                        <th id='camera-record' scope="col">摄像头录制</th>
+                        <th scope="col">中断次数</th>
+                        <th scope="col">累计时长</th>
+                        <th scope="col">禁止参加考试</th>
+                        <th scope="col">允许新IP登录</th>
+                        <th scope="col">交卷</th>
+
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- 学生列表将通过JavaScript动态加载 -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- 用户管理模态框 -->
+    <div class="modal fade" id="userManagementModal" tabindex="-1" aria-labelledby="userManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="userManagementModalLabel">用户状态管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>禁用用户</h6>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="disableUserInput" placeholder="输入学号">
+                                <button class="btn btn-danger" type="button" id="disableUserBtn">禁用</button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>启用用户</h6>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" id="enableUserInput" placeholder="输入学号">
+                                <button class="btn btn-success" type="button" id="enableUserBtn">启用</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <strong>提示：</strong>
+                        <ul class="mb-0">
+                            <li>禁用用户后，该用户将无法登录系统</li>
+                            <li>启用用户后，该用户可以正常登录系统</li>
+                            <li>请输入正确的7位数字学号</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="container-fluid text-center mb-4">
-        <button class="btn btn-info" id="start-btn">全体开始录制</button>
-        <button class="btn btn-danger" id="finish-btn">全体停止录制</button>
-        <button class="btn btn-success" id="notice-btn">发送通知</button>
-        <button class="btn btn-danger" id="disable-btn">取消登录权限</button>
-    </div>
-
-    <div class="col-10 container-fluid text-center">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th scope="col">序号</th>
-                    <th scope="col">学号</th>
-                    <th scope="col">姓名</th>
-                    <th scope="col">在线数量</th>
-                    <th id='screen-record' scope="col">屏幕录制</th>
-                    <!-- <th id='screen-extend' scope="col">屏幕扩展</th> -->
-                    <th id='screen-monitor' scope="col">实时查看</th>
-                    <th id='camera-record' scope="col">摄像头录制</th>
-                    <th id='camera-monitor' scope="col">实时查看</th>
-                    <th scope="col">中断次数</th>
-                    <th scope="col">累计时长</th>
-                    <th scope="col">禁止参加考试</th>
-                    <th scope="col">允许新IP登录</th>
-                    <th scope="col">交卷</th>
-                    <th scope="col">监考</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                {{each userList}}
-                <tr>
-                    <td>{{$index + 1}}</td>
-                    <td>{{$value.sno}}</td>
-                    <td>{{$value.name}}</td>
-                    <td id="{{$value.sno}}-online">0</td>
-                    <td class="screen" id="{{$value.sno}}-screen">未录制</td>
-                    <!-- <td class="screen-extend" id="{{$value.sno}}-screen-extend">/</td> -->
-                    <td class="screen-device" id="{{$value.sno}}-screen-device"></td>
-                    <td class="camera" id="{{$value.sno}}-camera">未录制</td>
-                    <td class="camera-device" id="{{$value.sno}}-camera-device"></td>
-                    <td class="interruptions" id="{{$value.sno}}-interruptions"></td>
-                    <td class="accumulated-duration" id="{{$value.sno}}-accumulated-duration"></td>
-                    <td><input type="checkbox" data-stu="{{ $value.sno }}" class="forbid-exam"></td>
-                    <td><input type="checkbox" data-stu="{{ $value.sno }}" class="allow-new-ip"></td>
-                    <td class="is-end" id="{{ $value.sno }}-is-end">/</td>
-                    <td id="{{$value.sno}}-monitor">/</td>
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
-    </div>
-</section>
-{{/block}}
-
-{{ block 'script' }}
-<script>
-    function formatMilliseconds(ms) {
-        const oneSecond = 1000;
-        const oneMinute = oneSecond * 60;
-        const oneHour = oneMinute * 60;
-
-        let remainingMilliseconds = ms;
-
-        const hours = Math.floor(remainingMilliseconds / oneHour);
-        remainingMilliseconds -= hours * oneHour;
-
-        const minutes = Math.floor(remainingMilliseconds / oneMinute);
-        remainingMilliseconds -= minutes * oneMinute;
-
-        const seconds = Math.floor(remainingMilliseconds / oneSecond);
-
-        let formattedString = '';
-
-        if (hours > 0) {
-            formattedString += `${hours}小时`;
-        }
-        if (minutes > 0) {
-            formattedString += `${minutes}分`;
-        }
-        if (seconds > 0) {
-            formattedString += `${seconds}秒`;
-        }
-
-        return formattedString || '0秒';
-    }
-
-    axios.get('/information').then((res) => {
-        const { networkConfig, videoConfig, sessionUser } = res.data;
-        const socket = io(`https://${document.domain}:${networkConfig.socketPort}`, { rejectUnauthorized: false });
-        for (const type in videoConfig.allowRecord) {
-            if (!videoConfig.allowRecord[type]) {
-                document.getElementById(`${type}-record`).style.display = 'none';
-                document.getElementById(`${type}-monitor`).style.display = 'none';
-                document.querySelectorAll(`.${type}`).forEach(element => element.style.display = 'none')
-                document.querySelectorAll(`.${type}-device`).forEach(element => element.style.display = 'none')
-                // if (type === 'screen') {
-                //     document.querySelectorAll('screen-extend').forEach(element => element.style.display = 'none')
-                // }
-            }
-        }
-        socket.on("connect", () => {
-            socket.emit('message', sessionUser.stu_no, 'online', true, () => {
-                document.getElementById('online-state-btn').innerText = '已连接';
+    <script src="/public/js/template.js"></script>
+    <script>
+        // 等待logger加载
+        function waitForLogger() {
+            return new Promise(resolve => {
+                const checkLogger = () => {
+                    if (window.logger) resolve();
+                    else setTimeout(checkLogger, 100);
+                };
+                checkLogger();
             });
-        });
-        socket.on('disable', (arg) => {
-            location.reload();
-        });
-        axios.get('/stulist').then((result) => {
-            const userList = {};
-            result.data.stulist.forEach(user => {
-                userList[user.sno] = user;
-                const userElement = document.querySelector(`[data-stu="${user.sno}"]`);
-                if (userElement) {
-                    const allowExamCheckbox = userElement.closest('tr').querySelector('.forbid-exam');
-                    const allowNewIPCheckbox = userElement.closest('tr').querySelector('.allow-new-ip');
-                    if (allowExamCheckbox) {
-                        allowExamCheckbox.checked = user.is_forbidden === '1';
-                    }
-                    if (allowNewIPCheckbox) {
-                        allowNewIPCheckbox.checked = user.enable_newip === '1';
-                    }
-                }
-                const isEndState = document.getElementById(`${user.sno}-is-end`);
-                isEndState.innerText = (user.is_end === '1' || user.is_end === 1) ? '已交卷' : '/';
-            });
-            socket.on('state', data => {
-                Object.values(data).filter(user => user.stu_userlevel === '0' && user.stu_no in userList).forEach(user => {
-                    const { stu_no, online, watchList, recordList } = user;
-                    const onlineState = document.getElementById(`${stu_no}-online`);
-                    onlineState.innerText = online.toString();
-                    onlineState.style.color = online > 0 ? "white" : "black";
-                    onlineState.style.fontWeight = online > 0 ? "bolder" : "normal";
-                    onlineState.className = online > 0 ? "bg-success" : "";
-                    for (const type in recordList) {
-                        const recordState = document.getElementById(`${stu_no}-${type}`);
-                        const deviceList = document.getElementById(`${stu_no}-${type}-device`);
-                        deviceList.innerHTML = "";
-                        // let screenExtend;
-                        // if (type === 'screen') {
-                        //     screenExtend = document.getElementById(`${stu_no}-screen-extend`);
-                        //     screenExtend.innerText = user.screenExtend;
-                        // }
-                        const interruptions = document.getElementById(`${stu_no}-interruptions`);
-                        interruptions.innerText = user.interruptions.toString();
-                        const accumulatedDuration = document.getElementById(`${stu_no}-accumulated-duration`);
-                        accumulatedDuration.innerText = formatMilliseconds(user.accumulatedDuration);
-                        if (videoConfig.allowRecord[type] && Object.keys(recordList[type]).length > 0) {
-                            recordState.innerText = "录制中";
-                            recordState.style.color = "green";
-                            let deviceCount = 0;
-                            for (const id in recordList[type]) {
-                                const device = recordList[type][id].device;
-                                let deviceLink = document.createElement("a");
-                                deviceLink.innerText = `${type === "screen" ? "屏幕" : "摄像头"}${++deviceCount}`;
-                                deviceLink.href = `/live/?id=${stu_no}&type=${type}&device=${device}`;
-                                deviceLink.target = "_blank";
-                                deviceList.append(deviceLink, document.createElement('br'));
-                            }
-                            if (type === 'screen') {
-                                if (deviceCount > 0 && user.screenExtend > deviceCount) {
-                                    screenExtend.style.color = "white";
-                                    screenExtend.style.fontWeight = "bolder";
-                                    screenExtend.className = "bg-danger";
-                                }
-                            }
-                        } else {
-                            recordState.innerText = "未录制";
-                            recordState.style.color = "black";
-                        }
-                    }
-                    let monitorList = document.getElementById(`${stu_no}-monitor`);
-                    if (Object.keys(watchList).length > 0) {
-                        monitorList.innerHTML = "";
-                        for (let user in watchList) {
-                            let monitorLabel = document.createElement("span");
-                            const { stu_no, stu_name } = watchList[user];
-                            monitorLabel.innerText = `${stu_no}${stu_name}`;
-                            monitorList.appendChild(monitorLabel);
-                        }
+        }
+        
+        (async () => {
+            await waitForLogger();
+            window.logger.info('MonitorPage', '监控页面脚本开始加载...');
+        })();
+
+        let socket;
+        let sessionUser;
+        let videoConfig = {};
+        let networkConfig = {};
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await waitForLogger();
+            window.logger.info('MonitorPage', 'DOM内容已加载，开始初始化监控页面...');
+            
+            // 等待模板系统初始化
+            await new Promise(resolve => {
+                const checkTemplate = () => {
+                    const hasTemplateSystem = !!window.templateSystem;
+                    const isInitialized = window.templateSystem?.isInitialized;
+
+                    if (window.templateSystem && window.templateSystem.isInitialized) {
+                        window.logger.debug('MonitorPage', '模板系统已完全初始化');
+                        resolve();
                     } else {
-                        monitorList = document.getElementById(`${stu_no}-monitor`);
-                        monitorList.innerText = "/";
+                        setTimeout(checkTemplate, 100);
                     }
-
-                });
+                };
+                checkTemplate();
             });
+
+            // 检查权限：1=普通管理员，>=5=超级管理员
+            const userLevel = parseInt(window.templateSystem.sessionUser?.stu_userlevel || '0');
+            window.logger.debug('MonitorPage', '检查用户权限', { 
+                sessionUser: window.templateSystem.sessionUser, 
+                userLevel 
+            });
+
+            if (!window.templateSystem.sessionUser || userLevel < 1) {
+                window.logger.error('MonitorPage', '权限不足，需要管理员权限');
+                window.templateSystem.showError('访问被拒绝：需要管理员权限');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+                return;
+            }
+
+            window.logger.info('MonitorPage', '权限检查通过');
+
+            // 所有管理员都可以使用用户管理功能
+
+            sessionUser = window.templateSystem.sessionUser;
+
+            window.logger.debug('MonitorPage', '开始加载配置...');
+            await loadConfiguration();
+
+            window.logger.debug('MonitorPage', '开始加载学生列表...');
+            await loadStudentList();
+
+            window.logger.debug('MonitorPage', '开始加载监考员列表...');
+            await loadSupervisorsList();
+
+            console.log('3️⃣ 设置Socket连接...');
+            setupSocketConnection();
+
+            console.log('4️⃣ 设置事件处理器...');
+            setupEventHandlers();
+
+            console.log('5️⃣ 启动系统状态更新...');
+            startSystemStatusUpdates();
+
+            console.log('✅ 监控页面初始化完成！');
         });
 
-        const sendEmit = async (type, data, target = '') => {
+        async function loadConfiguration() {
+            console.log('=== 开始加载配置 ===');
             try {
-                const response = await axios.post('/emit', {
-                    type: type,
-                    data: data,
-                    target: target,
-                });
-                if (response.data.code !== 0) {
-                    alert(response.data.message);
+                console.log('📡 正在请求 /api/information...');
+                const response = await axios.get('/api/information');
+                console.log('📡 API响应:', response);
+
+                if (response.data.success) {
+                    videoConfig = response.data.data.videoConfig;
+                    networkConfig = response.data.data.networkConfig;
+                    console.log('✅ 配置加载成功:');
+                    console.log('  - videoConfig:', videoConfig);
+                    console.log('  - networkConfig:', networkConfig);
                 } else {
-                    alert(type === 'record' ? `所有考生${data ? '开始' : '停止'}录制成功！` : response.data.message);
+                    console.error('❌ 配置加载失败:', response.data.message);
+                    if (window.templateSystem) {
+                        window.templateSystem.showError(`配置加载失败: ${response.data.message}`);
+                    }
                 }
             } catch (error) {
-                console.error(error);
+                console.error('❌ 加载配置异常:', error);
+                console.error('  - 错误类型:', error.name);
+                console.error('  - 错误消息:', error.message);
+                console.error('  - 响应状态:', error.response?.status);
+                console.error('  - 响应数据:', error.response?.data);
+
+                if (window.templateSystem) {
+                    window.templateSystem.showError('无法加载系统配置，监控功能可能无法正常工作');
+                }
+            }
+            console.log('=== 配置加载完成 ===');
+        }
+
+        async function loadStudentList() {
+            try {
+                window.templateSystem.showLoading('正在加载学生列表...');
+
+                const response = await axios.get('/api/stulist');
+                if (response.data.success) {
+                    // 显示考试信息（如果是考试模式）
+                    if (response.data.data.examInfo) {
+                        displayExamInfo(response.data.data.examInfo);
+                    }
+                    displayStudentList(response.data.data.stulist);
+                } else {
+                    window.templateSystem.showError(response.data.message);
+                }
+            } catch (error) {
+                console.error('加载学生列表失败:', error);
+                window.templateSystem.showError('加载学生列表失败');
+            } finally {
+                window.templateSystem.hideLoading();
             }
         }
 
-        document.getElementById('start-btn').onclick = async () => {
-            let result = confirm('是否让所有考生开始录制？\n已经开始录制的考生不受影响。');
-            if (result) {
-                await sendEmit('record', true);
-            }
-        };
-
-        document.getElementById('finish-btn').onclick = async () => {
-            let result = prompt('是否让所有考生停止录制？\n请输入“全体停止录制”后继续。\n已经停止录制的考生不受影响。');
-            if (result === '全体停止录制') {
-                await sendEmit('record', false);
-            } else {
-                alert("您的输入有误，录制未停止。");
-            }
-        };
-
-        document.getElementById('notice-btn').onclick = async () => {
-            let target = prompt('请输入要发送通知的学号，如需发送全体通知请输入all：');
-            let data = prompt('请输入要发送的通知：');
-            await sendEmit('notice', data, target);
-        };
-
-        document.getElementById('disable-btn').onclick = async () => {
-            let result = prompt('请输入要取消登录权限用户的学号：');
+        async function loadSupervisorsList() {
             try {
-                const response = await axios.post('/disable', { id: result });
-                if (response.data['code'] !== 0) {
-                    alert(response.data['message']);
+                const response = await axios.get('/api/supervisors');
+                if (response.data.success) {
+                    updateSupervisorsList(response.data.data.supervisors);
+                } else {
+                    console.error('获取监考员列表失败:', response.data.message);
                 }
             } catch (error) {
-                console.error(error);
+                console.error('加载监考员列表失败:', error);
             }
-        };
-    });
+        }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const checkboxes = document.querySelectorAll('.forbid-exam, .allow-new-ip');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function () {
-                const stuId = this.getAttribute('data-stu');
-                let type, op;
-                if (this.classList.contains('forbid-exam')) {
-                    type = 'exam';
-                    op = this.checked ? 'disable' : 'enable';
-                } else {
-                    type = 'newip';
-                    op = this.checked ? 'enable' : 'disable';
+        function displayExamInfo(examInfo) {
+            const examInfoDiv = document.getElementById('exam-info');
+            const examDetailsSpan = document.getElementById('exam-details');
+            const examInfoCol = document.getElementById('exam-info-col');
+
+            if (examInfo && examInfo.term && examInfo.cno && examInfo.eno) {
+                examDetailsSpan.textContent = `学期: ${examInfo.term} | 课号: ${examInfo.cno} | 考试编号: ${examInfo.eno}`;
+                examInfoDiv.style.display = 'block';
+                examInfoCol.style.display = 'table-cell';
+            } else {
+                examInfoDiv.style.display = 'none';
+                examInfoCol.style.display = 'none';
+            }
+        }
+
+        function displayStudentList(students) {
+            const tbody = document.getElementById('table-body');
+            const examInfoCol = document.getElementById('exam-info-col');
+            const isExamMode = examInfoCol.style.display !== 'none';
+            const colSpan = isExamMode ? 14 : 13;
+
+            if (!students || students.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="text-muted">暂无学生数据</td></tr>`;
+                return;
+            }
+
+            let html = '';
+            students.forEach((student, index) => {
+                // 生成唯一的行ID，支持多场考试
+                const uniqueId = isExamMode ?
+                    `${student.exam_term}-${student.exam_cno}-${student.exam_no}-${student.sno}` :
+                    student.sno;
+
+                html += `
+                    <tr data-unique-id="${uniqueId}">
+                        <td>${index + 1}</td>
+                        <td>${student.sno}</td>
+                        <td>${student.name}</td>`;
+
+                // 如果是考试模式，添加考试信息列
+                if (isExamMode) {
+                    html += `<td>${student.exam_term || ''}-${student.exam_cno || ''}-${student.exam_no || ''}</td>`;
                 }
-                axios.post('/manage', {
-                    srcId: stuId,
-                    type: type,
-                    op: op
-                }).catch(error => {
-                    console.error('An error occurred:', error);
+
+                html += `<td id="${uniqueId}-online">0</td>
+                        <td class="screen" id="${uniqueId}-screen">未录制</td>
+                        <td class="camera" id="${uniqueId}-camera">未录制</td>
+                        <td class="interruptions" id="${uniqueId}-interruptions">0</td>
+                        <td class="totalTime" id="${uniqueId}-totalTime">0秒</td>
+                        <td class="exam-forbidden" id="${uniqueId}-exam-forbidden">
+                            <button class="btn btn-sm btn-outline-danger" onclick="manageStudent('${student.sno}', 'forbidden', 1, '${uniqueId}')">禁止</button>
+                            <button class="btn btn-sm btn-outline-success" onclick="manageStudent('${student.sno}', 'forbidden', 0, '${uniqueId}')">允许</button>
+                        </td>
+                        <td class="new-ip" id="${uniqueId}-new-ip">
+                            <button class="btn btn-sm btn-outline-success" onclick="manageStudent('${student.sno}', 'new_ip', 1, '${uniqueId}')">允许</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="manageStudent('${student.sno}', 'new_ip', 0, '${uniqueId}')">禁止</button>
+                        </td>
+                        <td class="submit-exam" id="${uniqueId}-submit-exam">
+                            <button class="btn btn-sm btn-outline-primary" onclick="manageStudent('${student.sno}', 'submit', 1, '${uniqueId}')">交卷</button>
+                        </td>
+
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        function setupSocketConnection() {
+            if (!networkConfig.socketPort) {
+                console.error('Socket端口未配置');
+                return;
+            }
+
+            // 使用当前页面的host，确保与服务器地址一致
+            const currentHost = window.location.hostname;
+            const socketUrl = `https://${currentHost}:${networkConfig.socketPort}`;
+
+            socket = io(socketUrl, {
+                rejectUnauthorized: false,
+                timeout: 30000,  // 增加连接超时时间
+                forceNew: true,
+                transports: ['polling', 'websocket'],
+                upgrade: true,
+                upgradeTimeout: 30000,  // 增加升级超时时间
+                rememberUpgrade: true,
+                withCredentials: true
+            });
+
+            socket.on('connect', () => {
+                document.getElementById('online-state-btn').textContent = '已连接';
+                document.getElementById('online-state-btn').className = 'btn btn-outline-success';
+
+                if (window.templateSystem) {
+                    window.templateSystem.showSuccess('监控端连接成功');
+                }
+
+                // 连接成功后进行管理员认证
+                socket.emit('auth', {
+                    userId: sessionUser.stu_no,
+                    userType: 'admin'
+                }, (response) => {
+                    if (response && response.success) {
+                        console.log('管理员认证成功:', response.data);
+                        // 认证成功后请求当前状态
+                        requestCurrentState();
+                        // 刷新监考员列表（因为自己现在在线了）
+                        loadSupervisorsList();
+                    } else {
+                        console.error('管理员认证失败:', response);
+                        if (window.templateSystem) {
+                            window.templateSystem.showError('管理员认证失败');
+                        }
+                    }
                 });
             });
-        });
-    });
 
-</script>
+            socket.on('disconnect', (reason) => {
+                document.getElementById('online-state-btn').textContent = '未连接';
+                document.getElementById('online-state-btn').className = 'btn btn-outline-dark';
 
-{{ /block }}
+                if (window.templateSystem) {
+                    window.templateSystem.showWarning(`监控端连接断开: ${reason}`);
+                }
+            });
+
+            socket.on('connect_error', (error) => {
+                document.getElementById('online-state-btn').textContent = '连接失败';
+                document.getElementById('online-state-btn').className = 'btn btn-outline-danger';
+
+                // 显示错误提示
+                if (window.templateSystem) {
+                    window.templateSystem.showError(`监控端连接失败: ${error.message || error.description || '网络错误'}`);
+                }
+            });
+
+            socket.on('status', (data) => {
+                updateStudentStates(data.users);
+            });
+
+            socket.on('reconnect', () => {
+                console.log('Socket重连成功，重新认证...');
+                document.getElementById('online-state-btn').textContent = '重新认证中';
+                document.getElementById('online-state-btn').className = 'btn btn-outline-warning';
+
+                // 重连成功后重新认证
+                socket.emit('auth', {
+                    userId: sessionUser.stu_no,
+                    userType: 'admin'
+                }, (response) => {
+                    if (response && response.success) {
+                        console.log('重连后管理员认证成功:', response.data);
+                        document.getElementById('online-state-btn').textContent = '已连接';
+                        document.getElementById('online-state-btn').className = 'btn btn-outline-success';
+                        
+                        if (window.templateSystem) {
+                            window.templateSystem.showSuccess('重连并认证成功');
+                        }
+                        
+                        // 认证成功后请求当前状态
+                        requestCurrentState();
+                        // 刷新监考员列表
+                        loadSupervisorsList();
+                    } else {
+                        console.error('重连后管理员认证失败:', response);
+                        document.getElementById('online-state-btn').textContent = '认证失败';
+                        document.getElementById('online-state-btn').className = 'btn btn-outline-danger';
+                        
+                        if (window.templateSystem) {
+                            window.templateSystem.showError('重连认证失败');
+                        }
+                    }
+                });
+            });
+        }
+
+        function requestCurrentState() {
+            // 请求服务器发送当前状态
+            if (socket && socket.connected) {
+                socket.emit('status:request');
+            }
+        }
+
+        function updateStudentStates(states) {
+            let totalDevices = 0;
+
+            Object.values(states).forEach(user => {
+                // 只处理学生用户，跳过管理员
+                if (user.stu_userlevel !== '0') {
+                    return; // 跳过管理员用户
+                }
+
+                const studentId = user.stu_no;
+
+                // 查找对应的行ID（可能是简单的学号，也可能是考试模式的复合ID）
+                let rowElement = findStudentRow(studentId);
+                if (!rowElement) {
+                    // 如果找不到行元素，检查是否是需要动态添加的学生
+                    if (user.online > 0 || hasRecordingActivity(user)) {
+                        console.log(`动态添加在线学生 ${studentId} 到监控列表`);
+                        addDynamicStudentRow(user);
+                        rowElement = findStudentRow(studentId);
+                    }
+                    
+                    if (!rowElement) {
+                        // 仍然找不到，可能是不在监控范围内的学生，跳过
+                        console.log(`学生 ${studentId} 不在当前监控列表中`);
+                        return;
+                    }
+                }
+
+                const uniqueId = rowElement.getAttribute('data-unique-id');
+
+                updateStudentCell(uniqueId, 'online', user.online || 0);
+
+                // 检查录制状态
+                const screenRecording = getRecordingStatus(user, 'screen');
+                const cameraRecording = getRecordingStatus(user, 'camera');
+
+                updateStudentCell(uniqueId, 'screen', screenRecording);
+                updateStudentCell(uniqueId, 'camera', cameraRecording);
+                updateStudentCell(uniqueId, 'interruptions', user.interruptions || 0);
+                updateStudentCell(uniqueId, 'totalTime', formatTime(Math.floor((user.accumulatedDuration || 0) / 1000)));
+
+                // 统计设备数量（现在都是学生用户，直接统计）
+                const screenDevices = user.recordList && user.recordList.screen ? Object.keys(user.recordList.screen).length : 0;
+                const cameraDevices = user.recordList && user.recordList.camera ? Object.keys(user.recordList.camera).length : 0;
+                totalDevices += screenDevices + cameraDevices;
+            });
+
+            // 更新总设备数显示
+            const totalDevicesElement = document.getElementById('total-devices');
+            if (totalDevicesElement) {
+                totalDevicesElement.textContent = totalDevices;
+            }
+        }
+
+        function findStudentRow(studentId) {
+            // 首先尝试直接匹配学号
+            let row = document.querySelector(`tr[data-unique-id="${studentId}"]`);
+            if (row) return row;
+
+            // 如果没找到，尝试匹配包含学号的复合ID
+            const allRows = document.querySelectorAll('tr[data-unique-id]');
+            for (const row of allRows) {
+                const uniqueId = row.getAttribute('data-unique-id');
+                if (uniqueId && uniqueId.endsWith(`-${studentId}`)) {
+                    return row;
+                }
+            }
+
+            return null;
+        }
+
+        // 检查用户是否有录制活动
+        function hasRecordingActivity(user) {
+            if (!user.recordList) return false;
+            
+            const screenDevices = user.recordList.screen ? Object.keys(user.recordList.screen).length : 0;
+            const cameraDevices = user.recordList.camera ? Object.keys(user.recordList.camera).length : 0;
+            
+            return screenDevices > 0 || cameraDevices > 0;
+        }
+
+        // 动态添加学生行到表格
+        function addDynamicStudentRow(user) {
+            const tbody = document.getElementById('table-body');
+            const examInfoCol = document.getElementById('exam-info-col');
+            const isExamMode = examInfoCol.style.display !== 'none';
+            
+            // 计算当前行数，用于序号
+            const currentRows = tbody.querySelectorAll('tr').length;
+            const uniqueId = user.stu_no; // 动态添加的用户使用简单学号作为ID
+            
+            let html = `
+                <tr data-unique-id="${uniqueId}" class="dynamic-student">
+                    <td>${currentRows + 1}</td>
+                    <td>${user.stu_no}</td>
+                    <td>${user.stu_name} <span class="badge bg-info">在线</span></td>`;
+
+            // 如果是考试模式，添加空的考试信息列
+            if (isExamMode) {
+                html += `<td class="text-muted">动态用户</td>`;
+            }
+
+            html += `<td id="${uniqueId}-online">0</td>
+                    <td class="screen" id="${uniqueId}-screen">未录制</td>
+                    <td class="camera" id="${uniqueId}-camera">未录制</td>
+                    <td class="interruptions" id="${uniqueId}-interruptions">0</td>
+                    <td class="totalTime" id="${uniqueId}-totalTime">0秒</td>
+                    <td class="exam-forbidden" id="${uniqueId}-exam-forbidden">
+                        <button class="btn btn-sm btn-outline-danger" onclick="manageStudent('${user.stu_no}', 'forbidden', 1, '${uniqueId}')">禁止</button>
+                        <button class="btn btn-sm btn-outline-success" onclick="manageStudent('${user.stu_no}', 'forbidden', 0, '${uniqueId}')">允许</button>
+                    </td>
+                    <td class="new-ip" id="${uniqueId}-new-ip">
+                        <button class="btn btn-sm btn-outline-success" onclick="manageStudent('${user.stu_no}', 'new_ip', 1, '${uniqueId}')">允许</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="manageStudent('${user.stu_no}', 'new_ip', 0, '${uniqueId}')">禁止</button>
+                    </td>
+                    <td class="submit-exam" id="${uniqueId}-submit-exam">
+                        <button class="btn btn-sm btn-outline-primary" onclick="manageStudent('${user.stu_no}', 'submit', 1, '${uniqueId}')">交卷</button>
+                    </td>
+                </tr>
+            `;
+            
+            tbody.insertAdjacentHTML('beforeend', html);
+        }
+
+        function getRecordingStatus(user, type) {
+            if (!user.recordList || !user.recordList[type]) {
+                return '未录制';
+            }
+
+            const recordList = user.recordList[type];
+            const activeRecords = Object.keys(recordList).length;
+
+            if (activeRecords === 0) {
+                return '未录制';
+            } else if (activeRecords === 1) {
+                return '录制中';
+            } else {
+                return `录制中(${activeRecords}个设备)`;
+            }
+        }
+
+
+
+        function updateStudentCell(studentId, field, value) {
+            const cell = document.getElementById(`${studentId}-${field}`);
+            if (cell) {
+                cell.textContent = value;
+            }
+        }
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return `${hours}小时${minutes}分${secs}秒`;
+        }
+
+        function setupEventHandlers() {
+            // 全体开始录制
+            document.getElementById('start-btn').addEventListener('click', () => {
+                sendCommand('record', { action: 'start' });
+            });
+
+            // 全体停止录制
+            document.getElementById('finish-btn').addEventListener('click', () => {
+                sendCommand('record', { action: 'stop' });
+            });
+
+            // 发送通知
+            document.getElementById('notice-btn').addEventListener('click', () => {
+                const message = prompt('请输入通知内容:');
+                if (message) {
+                    sendCommand('notice', { target: 'all', message });
+                }
+            });
+
+            // 用户管理
+            document.getElementById('user-status-btn').addEventListener('click', () => {
+                openUserManagementModal();
+            });
+
+            // 文件管理
+            document.getElementById('file-monitor-btn').addEventListener('click', () => {
+                window.open('/history', '_blank', 'width=1400,height=900');
+            });
+
+            // 实时监控面板
+            document.getElementById('live-monitor-btn').addEventListener('click', () => {
+                window.open('/live', '_blank', 'width=1400,height=900');
+            });
+
+            // 用户状态管理事件
+            document.getElementById('disableUserBtn').addEventListener('click', () => {
+                const studentId = document.getElementById('disableUserInput').value.trim();
+                if (studentId) {
+                    updateUserStatus(studentId, '0');
+                    document.getElementById('disableUserInput').value = '';
+                }
+            });
+            
+            document.getElementById('enableUserBtn').addEventListener('click', () => {
+                const studentId = document.getElementById('enableUserInput').value.trim();
+                if (studentId) {
+                    updateUserStatus(studentId, '1');
+                    document.getElementById('enableUserInput').value = '';
+                }
+            });
+        }
+
+        async function sendCommand(type, data) {
+            try {
+                const response = await axios.post('/api/emit', { type, data });
+                if (response.data.success) {
+                    window.templateSystem.showSuccess(response.data.message);
+                } else {
+                    window.templateSystem.showError(response.data.message);
+                }
+            } catch (error) {
+                console.error('发送命令失败:', error);
+                window.templateSystem.showError('发送命令失败');
+            }
+        }
+
+        async function updateUserStatus(studentId, status) {
+            if (!studentId.match(/^\d{7}$/)) {
+                window.templateSystem.showError('请输入正确的7位数字学号');
+                return;
+            }
+            
+            const statusText = status === '1' ? '启用' : '禁用';
+            if (!confirm(`确定要${statusText}学号 ${studentId} 吗？`)) {
+                return;
+            }
+
+            try {
+                const response = await axios.post('/api/user-status', { id: studentId, status });
+                if (response.data.success) {
+                    window.templateSystem.showSuccess(response.data.message);
+                    // 重新加载学生列表
+                    setTimeout(() => {
+                        loadStudentList();
+                    }, 1000);
+                } else {
+                    window.templateSystem.showError(response.data.message);
+                }
+            } catch (error) {
+                console.error('修改用户状态失败:', error);
+                window.templateSystem.showError('修改用户状态失败');
+            }
+        }
+        
+        function openUserManagementModal() {
+            const modal = new bootstrap.Modal(document.getElementById('userManagementModal'));
+            modal.show();
+        }
+
+        async function manageStudent(studentId, type, operation, uniqueId = null) {
+            try {
+                const requestData = {
+                    srcId: studentId,
+                    type: type,
+                    op: operation
+                };
+
+                // 如果是考试模式，添加考试信息
+                if (uniqueId && uniqueId.includes('-')) {
+                    const parts = uniqueId.split('-');
+                    if (parts.length >= 4) {
+                        requestData.exam_term = parts[0];
+                        requestData.exam_cno = parts[1];
+                        requestData.exam_no = parts[2];
+                    }
+                }
+
+                const response = await axios.post('/api/manage', requestData);
+                if (response.data.success) {
+                    window.templateSystem.showSuccess('操作成功');
+                } else {
+                    window.templateSystem.showError(response.data.message);
+                }
+            } catch (error) {
+                console.error('管理操作失败:', error);
+                window.templateSystem.showError('管理操作失败');
+            }
+        }
+
+
+
+        // 系统状态更新功能
+        async function updateSystemStatus() {
+            try {
+                const response = await axios.get('/api/system-status');
+                if (response.data.success) {
+                    const data = response.data.data;
+
+                    // 更新系统状态
+                    document.getElementById('server-uptime').textContent = formatUptime(data.system.uptime);
+                    document.getElementById('memory-usage').textContent = formatMemory(data.system.memory.heapUsed, data.system.totalMemory);
+                    document.getElementById('online-users').textContent = data.userStats.online;
+                    document.getElementById('recording-users').textContent = data.userStats.recording;
+
+                    // 更新监考员列表
+                    updateSupervisorsList(data.supervisors);
+                }
+            } catch (error) {
+                console.error('更新系统状态失败:', error);
+            }
+        }
+
+        function formatUptime(seconds) {
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+
+            if (days > 0) {
+                return `${days}天${hours}小时${minutes}分钟`;
+            } else if (hours > 0) {
+                return `${hours}小时${minutes}分钟`;
+            } else {
+                return `${minutes}分钟`;
+            }
+        }
+
+        function formatMemory(used, total) {
+            const usedMB = Math.round(used / 1024 / 1024);
+            const totalMB = Math.round(total / 1024 / 1024);
+            const percentage = Math.round((used / total) * 100);
+            return `${usedMB}MB / ${totalMB}MB (${percentage}%)`;
+        }
+
+        function updateSupervisorsList(supervisors) {
+            const container = document.getElementById('supervisors-list');
+
+            if (!supervisors || supervisors.length === 0) {
+                container.innerHTML = '<small class="text-muted">暂无在线监考员</small>';
+                return;
+            }
+
+            let html = '';
+            supervisors.forEach(supervisor => {
+                const levelText = supervisor.stu_userlevel === '5' ? '超级管理员' : '管理员';
+                const badgeClass = supervisor.stu_userlevel === '5' ? 'bg-danger' : 'bg-primary';
+                const loginTime = supervisor.loginTime ? formatLoginTime(supervisor.loginTime) : '未知';
+                const ipAddress = supervisor.lastIP || '未知';
+
+                html += `
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">${supervisor.stu_name} (${supervisor.stu_no})</div>
+                                <span class="badge ${badgeClass}">${levelText}</span>
+                                <span class="badge bg-success ms-1">在线</span>
+                            </div>
+                        </div>
+                        <div class="mt-1">
+                            <small class="text-muted d-block">登录时间: ${loginTime}</small>
+                            <small class="text-muted d-block">IP地址: ${ipAddress}</small>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function formatLoginTime(loginTime) {
+            try {
+                const date = new Date(loginTime);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMins / 60);
+
+                if (diffMins < 1) {
+                    return '刚刚';
+                } else if (diffMins < 60) {
+                    return `${diffMins}分钟前`;
+                } else if (diffHours < 24) {
+                    return `${diffHours}小时前`;
+                } else {
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                }
+            } catch (error) {
+                return '未知';
+            }
+        }
+
+        function startSystemStatusUpdates() {
+            // 立即更新一次
+            updateSystemStatus();
+
+            // 每30秒更新一次系统状态
+            setInterval(updateSystemStatus, 30000);
+        }
+
+
+    </script>
+</body>
+
+</html>

@@ -1,55 +1,1001 @@
-{{extend './template.html'}}
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>历史视频查看</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .video-controls {
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .student-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background: #fff;
+        }
+        
+        .student-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #dee2e6;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .file-item {
+            padding: 12px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .file-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-item.active {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .file-info {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .no-files {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .btn-play {
+            background: #28a745;
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+        }
+        
+        .btn-download {
+            background: #17a2b8;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+        
+        .current-playing {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .video-placeholder {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 60px;
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
 
-{{block 'title'}}历史视频{{/block}}
+        /* 标签页样式 */
+        .nav-tabs .nav-link {
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .tab-content {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body id="page-top">
+    <!-- 导航栏和页脚将通过template.js自动添加 -->
 
-{{block 'content'}}
-<section id="features">
-    <div class="col-10 container-fluid text-center">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th scope="col">序号</th>
-                    <th scope="col">年级</th>
-                    <th scope="col">学号</th>
-                    <th scope="col">姓名</th>
-                    <th scope="col">专业</th>
-                    <th scope="col">历史视频</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                {{each user}}
-                <tr>
-                    <td>{{$index + 1}}</td>
-                    <td>{{$value.stu_grade}}</td>
-                    <td>{{$value.stu_no}}</td>
-                    <td>{{$value.stu_name}}</td>
-                    <td>{{$value.stu_class_sname}}</td>
-                    <td id="{{$value.stu_no}}"></td>
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
+    <div class="container-fluid p-4">
+        <!-- 页面标题 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="bi bi-play-circle-fill me-2"></i>历史视频查看</h2>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm me-2" onclick="refreshFiles()">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="goBack()">
+                            <i class="bi bi-arrow-left"></i> 返回
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="stats-card">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <h5 class="mb-1" id="total-students">0</h5>
+                            <small>学生数量</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="mb-1" id="total-files">0</h5>
+                            <small>视频文件</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="mb-1" id="total-size">0 MB</h5>
+                            <small>总大小</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h5 class="mb-1" id="last-updated">-</h5>
+                            <small>最近更新</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 标签页导航 -->
+        <ul class="nav nav-tabs" id="historyTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="video-tab" data-bs-toggle="tab" data-bs-target="#video-panel" type="button" role="tab" aria-controls="video-panel" aria-selected="true">
+                    <i class="bi bi-play-circle me-1"></i>视频播放
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="monitor-tab" data-bs-toggle="tab" data-bs-target="#monitor-panel" type="button" role="tab" aria-controls="monitor-panel" aria-selected="false">
+                    <i class="bi bi-activity me-1"></i>录制状态
+                </button>
+            </li>
+        </ul>
+
+        <!-- 标签页内容 -->
+        <div class="tab-content" id="historyTabContent">
+            <!-- 视频播放标签页 -->
+            <div class="tab-pane fade show active" id="video-panel" role="tabpanel" aria-labelledby="video-tab">
+                <div class="row">
+                    <!-- 文件列表 -->
+                    <div class="col-md-4">
+                        <!-- 搜索框 -->
+                        <div class="search-box">
+                            <input type="text" class="form-control" id="search-input" placeholder="搜索学生姓名或学号...">
+                        </div>
+
+                        <!-- 加载状态 -->
+                        <div class="loading-spinner text-center" id="loading">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">正在加载历史文件...</p>
+                        </div>
+
+                        <!-- 文件列表容器 -->
+                        <div id="files-container">
+                            <!-- 动态生成内容 -->
+                        </div>
+
+                        <!-- 无文件提示 -->
+                        <div class="no-files" id="no-files" style="display: none;">
+                            <i class="bi bi-camera-video display-1 text-muted"></i>
+                            <h5 class="mt-3">暂无录制文件</h5>
+                            <p>系统中还没有任何录制的视频文件</p>
+                        </div>
+                    </div>
+
+                    <!-- 视频播放区域 -->
+                    <div class="col-md-8">
+                        <!-- 当前播放信息 -->
+                        <div class="current-playing" id="current-playing" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-play-circle-fill text-success me-2"></i>
+                                <div>
+                                    <strong id="current-file-name">-</strong>
+                                    <br>
+                                    <small class="text-muted" id="current-student-info">-</small>
+                                </div>
+                                <div class="ms-auto">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="downloadCurrentFile()">
+                                        <i class="bi bi-download"></i> 下载
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteCurrentFile()">
+                                        <i class="bi bi-trash"></i> 删除
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 视频播放器 -->
+                        <div class="video-container">
+                            <video id="video-player" controls class="w-100" style="min-height: 400px; max-height: 70vh; display: none;">
+                                您的浏览器不支持视频播放。
+                            </video>
+                            
+                            <!-- 视频占位符 -->
+                            <div class="video-placeholder" id="video-placeholder">
+                                <i class="bi bi-camera-video display-1"></i>
+                                <h5 class="mt-3">选择视频文件进行播放</h5>
+                                <p>请从左侧列表中选择要播放的视频文件</p>
+                            </div>
+                        </div>
+
+                        <!-- 视频控制信息 -->
+                        <div class="video-controls" id="video-controls" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <small>
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        <span id="video-info">-</span>
+                                    </small>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <small>
+                                        <i class="bi bi-clock me-1"></i>
+                                        <span id="video-duration">-</span>
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 录制状态标签页 -->
+            <div class="tab-pane fade" id="monitor-panel" role="tabpanel" aria-labelledby="monitor-tab">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>录制状态实时监控</h4>
+                    <button class="btn btn-outline-primary btn-sm" onclick="loadRecordingStatus()">
+                        <i class="bi bi-arrow-clockwise"></i> 刷新
+                    </button>
+                </div>
+                <div id="recording-status-container">
+                    <!-- 录制状态数据将通过JavaScript动态加载 -->
+                </div>
+            </div>
+        </div>
     </div>
-</section>
-{{/block}}
 
-{{ block 'script' }}
-<script>
-    axios.get('/file').then(res => {
-        console.log(res.data)
-        let records = res.data;
-        for (let id in records) {
-            let cell = document.getElementById(id);
-            cell.innerHTML = '';
-            for (let videoId of records[id]) {
-                let link = document.createElement('a');
-                link.href = `/video/${videoId}`;
-                link.target = '_blank';
-                link.innerText = videoId;
-                cell.append(link, document.createElement('br'));
+    <script src="/public/js/template.js"></script>
+    <script>
+        let recordedFiles = {};
+        let currentFileUrl = null;
+        let currentFileName = null;
+        let currentStudentId = null;
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('📁 历史视频页面加载完成');
+            
+            // 等待模板系统初始化
+            await new Promise(resolve => {
+                const checkTemplate = () => {
+                    if (window.templateSystem) {
+                        resolve();
+                    } else {
+                        setTimeout(checkTemplate, 100);
+                    }
+                };
+                checkTemplate();
+            });
+
+            // 检查权限并初始化
+            const userLevel = parseInt(window.templateSystem.sessionUser?.stu_userlevel || '0');
+            if (!window.templateSystem.sessionUser || userLevel < 1) {
+                window.templateSystem.showError('访问被拒绝：需要管理员权限');
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 2000);
+                return;
+            }
+
+            initialize();
+            setupEventListeners();
+            setupTabEventListeners();
+        });
+
+        // 初始化函数
+        async function initialize() {
+            try {
+                console.log('🔍 开始加载历史文件列表...');
+                showLoading(true);
+                
+                await loadRecordedFiles();
+                
+            } catch (error) {
+                console.error('❌ 初始化失败:', error);
+                const message = error.message || '初始化失败';
+                
+                // 如果是权限错误，跳转到首页
+                if (error.status === 403 || message.includes('权限')) {
+                    window.templateSystem.showError('权限不足：只有管理员可以查看历史视频');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                    return;
+                }
+                
+                window.templateSystem.showError(`历史视频加载失败: ${message}`);
+                showError(message);
+            } finally {
+                showLoading(false);
             }
         }
-    });
-</script>
 
-{{ /block }}
+        // 设置标签页事件监听器
+        function setupTabEventListeners() {
+            // 监听标签页切换事件
+            document.getElementById('monitor-tab').addEventListener('shown.bs.tab', function (e) {
+                loadRecordingStatus();
+                // 开始定时刷新
+                if (window.monitorInterval) {
+                    clearInterval(window.monitorInterval);
+                }
+                window.monitorInterval = setInterval(loadRecordingStatus, 5000);
+            });
+
+            document.getElementById('video-tab').addEventListener('shown.bs.tab', function (e) {
+                // 停止定时刷新
+                if (window.monitorInterval) {
+                    clearInterval(window.monitorInterval);
+                    window.monitorInterval = null;
+                }
+            });
+        }
+
+        // 加载录制文件列表
+        async function loadRecordedFiles() {
+            try {
+                const response = await fetch('/api/recorded-files');
+                
+                // 检查HTTP状态码
+                if (!response.ok) {
+                    if (response.status === 403) {
+                        const error = new Error('权限不足：需要管理员权限');
+                        error.status = 403;
+                        throw error;
+                    }
+                    throw new Error(`服务器错误: ${response.status}`);
+                }
+                
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || '获取文件列表失败');
+                }
+
+                recordedFiles = data.data || {};
+                console.log('✅ 文件列表加载成功:', Object.keys(recordedFiles).length, '个学生');
+                
+                renderFilesList();
+                updateStats();
+                
+            } catch (error) {
+                console.error('❌ 加载文件列表失败:', error);
+                
+                // 权限错误特殊处理
+                if (error.status === 403) {
+                    throw error;
+                }
+                
+                throw new Error(`加载文件列表失败: ${error.message}`);
+            }
+        }
+
+        // 渲染文件列表
+        function renderFilesList() {
+            const container = document.getElementById('files-container');
+            const searchTerm = document.getElementById('search-input').value.toLowerCase();
+            
+            if (Object.keys(recordedFiles).length === 0) {
+                document.getElementById('no-files').style.display = 'block';
+                container.innerHTML = '';
+                return;
+            }
+
+            document.getElementById('no-files').style.display = 'none';
+            
+            let html = '';
+            
+            // 按学号排序
+            const sortedStudents = Object.keys(recordedFiles).sort();
+            
+            for (const studentId of sortedStudents) {
+                const studentData = recordedFiles[studentId];
+                const studentName = studentData.studentName;
+                
+                // 搜索过滤
+                if (searchTerm && 
+                    !studentId.includes(searchTerm) && 
+                    !studentName.toLowerCase().includes(searchTerm)) {
+                    continue;
+                }
+                
+                html += `
+                    <div class="student-card">
+                        <div class="student-header">
+                            <h6 class="mb-1">
+                                <i class="bi bi-person-fill me-2"></i>
+                                ${studentName}
+                            </h6>
+                            <small class="text-muted">学号: ${studentId} | ${studentData.files.length} 个文件</small>
+                        </div>
+                `;
+                
+                for (const file of studentData.files) {
+                    const fileId = `${studentId}_${file.name}`;
+                    const recordTime = new Date(file.modificationTime).toLocaleString('zh-CN');
+                    
+                    html += `
+                        <div class="file-item" data-student-id="${studentId}" data-file-name="${file.name}" 
+                             data-play-url="${file.playUrl}" data-download-url="${file.downloadUrl}"
+                             onclick="playVideo('${studentId}', '${file.name}', '${file.playUrl}', '${file.downloadUrl}')">
+                            <div class="d-flex align-items-center">
+                                <button class="btn-play">
+                                    <i class="bi bi-play-fill"></i>
+                                </button>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">${file.name}</div>
+                                    <div class="file-info">
+                                        <i class="bi bi-calendar me-1"></i>${recordTime} |
+                                        <i class="bi bi-file-earmark me-1"></i>${file.size}
+                                    </div>
+                                </div>
+                                <button class="btn-download" onclick="downloadFile(event, '${file.downloadUrl}', '${file.name}')">
+                                    <i class="bi bi-download"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
+        }
+
+        // 播放视频
+        async function playVideo(studentId, fileName, playUrl, downloadUrl) {
+            try {
+                console.log('🎥 开始播放视频:', fileName);
+                
+                // 更新当前播放信息
+                currentStudentId = studentId;
+                currentFileName = fileName;
+                currentFileUrl = downloadUrl;
+                
+                // 更新UI状态
+                updateActiveFileItem(studentId, fileName);
+                showCurrentPlaying(studentId, fileName);
+                
+                // 设置视频源
+                const videoPlayer = document.getElementById('video-player');
+                const videoPlaceholder = document.getElementById('video-placeholder');
+                const videoControls = document.getElementById('video-controls');
+                
+                // 先显示加载状态
+                videoPlayer.style.display = 'block';
+                videoPlaceholder.style.display = 'none';
+                videoControls.style.display = 'block';
+                
+                // 设置视频事件监听器（处理WebRecorder文件特殊性）
+                setupVideoEventListeners(videoPlayer, fileName);
+                
+                // 设置视频源
+                videoPlayer.src = playUrl;
+                
+                // 更新视频信息
+                updateVideoInfo(fileName);
+                
+                console.log('✅ 视频设置完成');
+                
+            } catch (error) {
+                console.error('❌ 播放视频失败:', error);
+                const message = error.message || '播放失败';
+                window.templateSystem.showError(`视频播放失败: ${message}`);
+            }
+        }
+
+        // 设置视频播放器事件监听器（处理WebRecorder文件特殊性）
+        function setupVideoEventListeners(videoPlayer, fileName) {
+            // 清除之前的事件监听器
+            const newVideoPlayer = videoPlayer.cloneNode(true);
+            videoPlayer.parentNode.replaceChild(newVideoPlayer, videoPlayer);
+            
+            // 重新获取元素引用
+            const player = document.getElementById('video-player');
+            
+            let hasValidDuration = false;
+            let loadStartTime = Date.now();
+            
+            // 监听元数据加载
+            player.addEventListener('loadedmetadata', () => {
+                console.log('📊 视频元数据加载完成');
+                const duration = player.duration;
+                
+                if (duration && !isNaN(duration) && isFinite(duration)) {
+                    hasValidDuration = true;
+                    const formattedDuration = formatDuration(duration);
+                    document.getElementById('video-duration').textContent = `时长: ${formattedDuration}`;
+                    console.log('✅ 视频时长信息有效:', formattedDuration);
+                } else {
+                    hasValidDuration = false;
+                    document.getElementById('video-duration').textContent = `时长: 未知 (WebRecorder录制)`;
+                    console.log('⚠️ 视频文件无时长信息，可能是WebRecorder录制的文件');
+                    
+                    // 显示WebRecorder文件提示
+                    showWebRecorderWarning();
+                }
+            });
+            
+            // 监听加载错误
+            player.addEventListener('error', (e) => {
+                console.error('❌ 视频加载错误:', e);
+                const error = player.error;
+                let message = '视频加载失败';
+                
+                if (error) {
+                    switch (error.code) {
+                        case error.MEDIA_ERR_ABORTED:
+                            message = '视频加载被中止';
+                            break;
+                        case error.MEDIA_ERR_NETWORK:
+                            message = '网络错误，无法加载视频';
+                            break;
+                        case error.MEDIA_ERR_DECODE:
+                            message = '视频解码错误';
+                            break;
+                        case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                            message = '不支持的视频格式';
+                            break;
+                    }
+                }
+                
+                window.templateSystem.showError(`${message}: ${fileName}`);
+            });
+            
+            // 监听播放开始
+            player.addEventListener('play', () => {
+                console.log('▶️ 视频开始播放');
+                if (!hasValidDuration) {
+                    // 对于没有时长信息的视频，开始计时
+                    startPlaybackTimer();
+                }
+            });
+            
+            // 监听播放暂停
+            player.addEventListener('pause', () => {
+                console.log('⏸️ 视频暂停播放');
+                stopPlaybackTimer();
+            });
+            
+            // 监听播放结束
+            player.addEventListener('ended', () => {
+                console.log('🏁 视频播放结束');
+                stopPlaybackTimer();
+            });
+            
+            // 监听时间更新（用于显示当前播放时间）
+            player.addEventListener('timeupdate', () => {
+                if (hasValidDuration) {
+                    // 有时长信息的正常处理
+                    const current = formatDuration(player.currentTime);
+                    const total = formatDuration(player.duration);
+                    document.getElementById('video-duration').textContent = `${current} / ${total}`;
+                } else {
+                    // 没有时长信息，只显示当前播放时间
+                    const current = formatDuration(player.currentTime);
+                    document.getElementById('video-duration').textContent = `已播放: ${current}`;
+                }
+            });
+        }
+        
+        let playbackTimer = null;
+        
+        // 开始播放计时器（用于WebRecorder文件）
+        function startPlaybackTimer() {
+            stopPlaybackTimer(); // 确保没有重复的计时器
+            
+            const startTime = Date.now();
+            playbackTimer = setInterval(() => {
+                const player = document.getElementById('video-player');
+                if (player && !player.paused) {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    // 这里可以添加自定义的播放进度显示
+                }
+            }, 1000);
+        }
+        
+        // 停止播放计时器
+        function stopPlaybackTimer() {
+            if (playbackTimer) {
+                clearInterval(playbackTimer);
+                playbackTimer = null;
+            }
+        }
+        
+        // 显示WebRecorder文件警告
+        function showWebRecorderWarning() {
+            const warningHtml = `
+                <div class="alert alert-warning alert-dismissible fade show mt-2" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>注意：</strong>此视频文件由WebRecorder录制，可能无法显示准确的时长信息和进度条。播放功能正常，但进度拖拽可能受限。
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            const videoControls = document.getElementById('video-controls');
+            if (videoControls && !videoControls.querySelector('.alert-warning')) {
+                videoControls.insertAdjacentHTML('afterend', warningHtml);
+            }
+        }
+
+        // 下载文件
+        function downloadFile(event, downloadUrl, fileName) {
+            event.stopPropagation(); // 阻止点击事件冒泡
+            
+            console.log('📥 开始下载文件:', fileName);
+            
+            // 创建隐藏的下载链接
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = fileName;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            console.log('✅ 下载开始');
+        }
+
+        // 下载当前播放的文件
+        function downloadCurrentFile() {
+            if (currentFileUrl && currentFileName) {
+                downloadFile({ stopPropagation: () => {} }, currentFileUrl, currentFileName);
+            }
+        }
+
+        // 删除当前播放的文件
+        async function deleteCurrentFile() {
+            if (!currentStudentId || !currentFileName) {
+                window.templateSystem.showError('没有选择文件');
+                return;
+            }
+
+            if (!confirm(`确定要删除文件 "${currentFileName}" 吗？此操作不可恢复。`)) {
+                return;
+            }
+
+            try {
+                window.templateSystem.showLoading('正在删除文件...');
+                
+                const response = await fetch(`/api/files/${currentStudentId}/${encodeURIComponent(currentFileName)}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.templateSystem.showSuccess('文件删除成功');
+                    
+                    // 清除当前播放状态
+                    currentStudentId = null;
+                    currentFileName = null;
+                    currentFileUrl = null;
+                    
+                    // 隐藏播放器
+                    document.getElementById('video-player').style.display = 'none';
+                    document.getElementById('video-placeholder').style.display = 'block';
+                    document.getElementById('video-controls').style.display = 'none';
+                    document.getElementById('current-playing').style.display = 'none';
+                    
+                    // 重新加载文件列表
+                    setTimeout(() => {
+                        loadRecordedFiles();
+                    }, 1000);
+                } else {
+                    window.templateSystem.showError(data.message || '删除文件失败');
+                }
+            } catch (error) {
+                console.error('删除文件失败:', error);
+                const message = error.response?.data?.message || error.message || '删除文件失败';
+                window.templateSystem.showError(message);
+            } finally {
+                window.templateSystem.hideLoading();
+            }
+        }
+
+        // 更新活跃文件项
+        function updateActiveFileItem(studentId, fileName) {
+            // 移除所有活跃状态
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // 添加当前文件的活跃状态
+            const currentItem = document.querySelector(
+                `[data-student-id="${studentId}"][data-file-name="${fileName}"]`
+            );
+            if (currentItem) {
+                currentItem.classList.add('active');
+            }
+        }
+
+        // 显示当前播放信息
+        function showCurrentPlaying(studentId, fileName) {
+            const studentData = recordedFiles[studentId];
+            if (!studentData) return;
+            
+            document.getElementById('current-file-name').textContent = fileName;
+            document.getElementById('current-student-info').textContent = 
+                `${studentData.studentName} (${studentId})`;
+            document.getElementById('current-playing').style.display = 'block';
+        }
+
+        // 更新视频信息
+        function updateVideoInfo(fileName) {
+            document.getElementById('video-info').textContent = `文件: ${fileName}`;
+            
+            // 显示加载中状态
+            document.getElementById('video-duration').textContent = '加载中...';
+            
+            // 添加文件类型提示
+            if (fileName.includes('screen')) {
+                document.getElementById('video-info').textContent += ' (屏幕录制)';
+            } else if (fileName.includes('camera')) {
+                document.getElementById('video-info').textContent += ' (摄像头录制)';
+            }
+        }
+
+        // 格式化时长
+        function formatDuration(seconds) {
+            if (isNaN(seconds)) return '未知';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // 更新统计信息
+        function updateStats() {
+            const students = Object.keys(recordedFiles);
+            let totalFiles = 0;
+            let totalSizeBytes = 0;
+            let lastModified = new Date(0);
+            
+            students.forEach(studentId => {
+                const studentData = recordedFiles[studentId];
+                totalFiles += studentData.files.length;
+                
+                studentData.files.forEach(file => {
+                    // 解析文件大小（从格式化的字符串中提取）
+                    const sizeStr = file.size;
+                    if (sizeStr.includes('MB')) {
+                        totalSizeBytes += parseFloat(sizeStr) * 1024 * 1024;
+                    } else if (sizeStr.includes('KB')) {
+                        totalSizeBytes += parseFloat(sizeStr) * 1024;
+                    } else if (sizeStr.includes('GB')) {
+                        totalSizeBytes += parseFloat(sizeStr) * 1024 * 1024 * 1024;
+                    }
+                    
+                    const fileDate = new Date(file.modificationTime);
+                    if (fileDate > lastModified) {
+                        lastModified = fileDate;
+                    }
+                });
+            });
+            
+            document.getElementById('total-students').textContent = students.length;
+            document.getElementById('total-files').textContent = totalFiles;
+            document.getElementById('total-size').textContent = formatFileSize(totalSizeBytes);
+            document.getElementById('last-updated').textContent = 
+                lastModified.getTime() > 0 ? lastModified.toLocaleDateString('zh-CN') : '-';
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 搜索框事件
+            document.getElementById('search-input').addEventListener('input', debounce(() => {
+                renderFilesList();
+            }, 300));
+        }
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 显示/隐藏加载状态
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // 显示错误信息
+        function showError(message) {
+            const container = document.getElementById('files-container');
+            container.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        // 刷新文件列表
+        async function refreshFiles() {
+            console.log('🔄 刷新文件列表...');
+            showLoading(true);
+            
+            try {
+                await loadRecordedFiles();
+                window.templateSystem.showSuccess('文件列表已刷新');
+                
+            } catch (error) {
+                console.error('❌ 刷新失败:', error);
+                const message = error.message || '刷新失败';
+                window.templateSystem.showError(`刷新失败: ${message}`);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 返回上一页
+        function goBack() {
+            window.history.back();
+        }
+
+        // 录制状态监控相关功能
+        async function loadRecordingStatus() {
+            try {
+                const response = await fetch('/api/recording-status');
+                if (response.data?.success) {
+                    displayRecordingStatus(response.data.data);
+                } else {
+                    const data = await response.json();
+                    if (data.success) {
+                        displayRecordingStatus(data.data);
+                    } else {
+                        console.error('加载录制状态数据失败:', data.message);
+                        document.getElementById('recording-status-container').innerHTML =
+                            '<div class="alert alert-warning">加载录制状态数据失败</div>';
+                    }
+                }
+            } catch (error) {
+                console.error('加载录制状态数据失败:', error);
+                document.getElementById('recording-status-container').innerHTML =
+                    '<div class="alert alert-danger">网络错误，无法加载录制状态数据</div>';
+            }
+        }
+
+        function displayRecordingStatus(data) {
+            const container = document.getElementById('recording-status-container');
+
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">暂无录制状态数据</div>';
+                return;
+            }
+
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>学号</th>
+                                <th>最后修改时间</th>
+                                <th>文件大小</th>
+                                <th>状态</th>
+                                <th>时间差(秒)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            data.forEach(file => {
+                const statusClass = file.isBelowThreshold ? 'text-success' : 'text-warning';
+                const statusText = file.isBelowThreshold ? '活跃' : '静默';
+                const statusIcon = file.isBelowThreshold ? '🟢' : '🟡';
+
+                html += `
+                    <tr>
+                        <td><strong>${file.studentId}</strong></td>
+                        <td>${file.modificationTimeStr}</td>
+                        <td>${file.fileSize}</td>
+                        <td class="${statusClass}">
+                            ${statusIcon} ${statusText}
+                        </td>
+                        <td>${Math.round(file.timeDiff)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle"></i>
+                        活跃：最近30秒内有文件更新 | 静默：超过30秒未更新 | 自动刷新间隔：5秒
+                    </small>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

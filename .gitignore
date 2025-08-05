@@ -159,6 +159,5 @@ wheels/
 .installed.cfg
 *.egg
 
-# Chinese named files (project specific)
-初始禁止学生进入某场考试.sql
-注意事项.txt
+trash/
+config.ts

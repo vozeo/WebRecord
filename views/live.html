@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>实时监控</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .monitor-panel { height: 100vh; overflow: hidden; }
+        .student-list { height: 100vh; overflow-y: auto; border-right: 1px solid #dee2e6; }
+        .video-display { height: 100vh; background: #000; display: flex; align-items: center; justify-content: center; position: relative; }
+        .video-container { width: 100%; height: 100%; position: relative; display: flex; }
+        .main-video-area { flex: 1; position: relative; }
+        .main-video { width: 100%; height: 100%; object-fit: contain; }
+        .thumbnail-area { width: 200px; background: rgba(0,0,0,0.8); padding: 10px; display: none; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .thumbnail-area.show { display: flex; }
+        .video-thumbnail { width: 100%; height: 120px; object-fit: cover; border: 2px solid transparent; border-radius: 5px; cursor: pointer; transition: border-color 0.2s; }
+        .video-thumbnail.active { border-color: #2196f3; }
+        .video-thumbnail:hover { border-color: #64b5f6; }
+        .thumbnail-info { color: white; font-size: 12px; text-align: center; margin-top: 5px; }
+        .student-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: background-color 0.2s; }
+        .student-item:hover { background-color: #f8f9fa; }
+        .student-item.active { background-color: #e3f2fd; border-left: 4px solid #2196f3; }
+        .student-info { display: flex; justify-content: space-between; align-items: center; }
+        .recording-status { display: flex; gap: 5px; }
+        .status-badge { padding: 2px 6px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .status-recording { background: #4caf50; color: white; }
+        .status-offline { background: #9e9e9e; color: white; }
+        .video-info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; font-size: 14px; }
+        .connection-status { position: absolute; top: 10px; right: 10px; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+        .status-connecting { background: #ffc107; color: #000; }
+        .status-connected { background: #28a745; color: #fff; }
+        .status-error { background: #dc3545; color: #fff; }
+        .no-video { color: #6c757d; text-align: center; font-size: 18px; }
+        .stats-panel { position: absolute; top: 50px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; border-radius: 5px; font-size: 12px; min-width: 200px; }
+        .stats-row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .stats-row:last-child { margin-bottom: 0; }
+    </style>
+</head>
+<body>
+    <div class="container-fluid monitor-panel">
+        <div class="row h-100">
+            <div class="col-md-3 student-list p-0">
+                <div class="p-3 border-bottom">
+                    <h5 class="mb-0">在线学生</h5>
+                    <small class="text-muted">点击学生查看其录制内容</small>
+                </div>
+                <div id="student-list-container"></div>
+            </div>
+            
+            <div class="col-md-9 video-display p-0">
+                <div class="video-container">
+                    <div class="main-video-area">
+                        <video id="main-video" class="main-video" autoplay muted playsinline></video>
+                        
+                        <div id="video-info" class="video-info" style="display: none;">
+                            <div id="current-student">未选择学生</div>
+                            <div id="current-stream">未选择流</div>
+                        </div>
+                        
+                        <div id="connection-status" class="connection-status status-connecting">连接中...</div>
+                        
+                        <div id="stats-panel" class="stats-panel" style="display: none;">
+                            <div class="stats-row"><span>学生:</span><span id="current-student-name">未选择</span></div>
+                            <div class="stats-row"><span>流类型:</span><span id="current-stream-type">未选择</span></div>
+                            <div class="stats-row"><span>设备:</span><span id="current-device-name">未选择</span></div>
+                            <div class="stats-row"><span>中断次数:</span><span id="current-interruptions">0</span></div>
+                            <div class="stats-row"><span>累计时长:</span><span id="current-duration">0秒</span></div>
+                        </div>
+                        
+                        <div id="no-video" class="no-video">
+                            <h4>请选择要监控的学生</h4>
+                            <p>选择后将自动连接所有录制流，点击缩略图可切换主视频</p>
+                        </div>
+                    </div>
+                    
+                    <div id="thumbnail-area" class="thumbnail-area"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/public/js/template.js"></script>
+    <script>
+        let socket = null;
+        let peer = null;
+        let networkConfig = null;
+        let sessionUser = null;
+        let allUsers = {};
+        let currentStudent = null;
+        let activeStreams = new Map();
+        let currentMainStream = null;
+
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await loadConfiguration();
+                if (networkConfig && sessionUser) {
+                    await setupConnections();
+                }
+            } catch (error) {
+                const message = error.response?.data?.message || error.message || '初始化失败';
+                updateConnectionStatus('error', `初始化失败: ${message}`);
+                showError(`实时监控初始化失败: ${message}`);
+            }
+        });
+
+        async function loadConfiguration() {
+            const response = await fetch('/api/information');
+            const data = await response.json();
+
+            if (!data.success) {
+                if (data.message && data.message.includes('未授权')) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error('获取配置信息失败: ' + data.message);
+            }
+
+            networkConfig = data.data.networkConfig;
+            sessionUser = data.data.sessionUser;
+
+            if (!sessionUser || sessionUser.stu_userlevel !== '1') {
+                throw new Error('需要管理员权限');
+            }
+        }
+
+        async function setupConnections() {
+            await setupSocketConnection();
+            setupWebRTCConnection();
+        }
+
+        function setupSocketConnection() {
+            return new Promise((resolve, reject) => {
+                const socketUrl = `https://${window.location.hostname}:${networkConfig.socketPort}`;
+
+                socket = io(socketUrl, {
+                    rejectUnauthorized: false,
+                    timeout: 30000,
+                    forceNew: true,
+                    transports: ['polling', 'websocket'],
+                    upgrade: true,
+                    upgradeTimeout: 30000,
+                    withCredentials: true,
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionDelayMax: 5000,
+                    maxReconnectionAttempts: Infinity
+                });
+
+                socket.on('connect', () => {
+                    updateConnectionStatus('connected', '已连接');
+
+                    socket.emit('auth', {
+                        userId: sessionUser.stu_no,
+                        userType: 'admin'
+                    }, (response) => {
+                        if (response && response.success) {
+                            socket.emit('status:request');
+                            resolve();
+                        } else {
+                            updateConnectionStatus('error', '认证失败');
+                            reject(new Error('管理员认证失败'));
+                        }
+                    });
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateConnectionStatus('error', 'Socket连接失败');
+                    reject(new Error('Socket连接失败'));
+                });
+
+                socket.on('status', (data) => {
+                    if (data.users) {
+                        allUsers = data.users;
+                        updateStudentList();
+                    }
+                });
+
+                socket.on('disconnect', (reason) => {
+                    updateConnectionStatus('error', 'Socket连接断开');
+                    clearAllStreams();
+                });
+
+                socket.on('reconnect', () => {
+                    updateConnectionStatus('connected', '重连成功');
+                    
+                    socket.emit('auth', {
+                        userId: sessionUser.stu_no,
+                        userType: 'admin'
+                    }, (response) => {
+                        if (response && response.success) {
+                            socket.emit('status:request');
+                            
+                            if (currentStudent) {
+                                setTimeout(() => {
+                                    connectToStudent(currentStudent);
+                                }, 1000);
+                            }
+                        } else {
+                            updateConnectionStatus('error', '重连认证失败');
+                        }
+                    });
+                });
+            });
+        }
+
+        function setupWebRTCConnection() {
+            const randomId = Math.random().toString(36).substring(2, 15);
+            const peerId = `live-monitor-${sessionUser.stu_no}-${Date.now()}-${randomId}`;
+
+            peer = new Peer(peerId, {
+                host: window.location.hostname,
+                port: networkConfig.socketPort,
+                path: "/webrtc",
+                secure: true,
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        {
+                            urls: `turn:${window.location.hostname}:${networkConfig.turnServerPort}`,
+                            username: networkConfig.turnServerUsername,
+                            credential: networkConfig.turnServerCredential
+                        }
+                    ]
+                }
+            });
+
+            peer.on('open', (id) => {
+                // WebRTC Peer已连接
+            });
+
+            peer.on('error', (error) => {
+                showError('WebRTC连接错误: ' + error.message);
+                if (peer.destroyed) {
+                    setTimeout(() => setupWebRTCConnection(), 5000);
+                }
+            });
+
+            peer.on('disconnected', () => {
+                if (!peer.destroyed) {
+                    peer.reconnect();
+                }
+            });
+        }
+
+        function updateConnectionStatus(status, message) {
+            const indicator = document.getElementById('connection-status');
+            indicator.className = `connection-status status-${status}`;
+            indicator.textContent = message;
+        }
+
+        function updateStudentList() {
+            const container = document.getElementById('student-list-container');
+            let html = '';
+
+            Object.values(allUsers).forEach(user => {
+                if (user.stu_userlevel === '1') return;
+
+                const isOnline = user.online > 0;
+                const screenDevices = user.recordList && user.recordList.screen ? Object.keys(user.recordList.screen).length : 0;
+                const cameraDevices = user.recordList && user.recordList.camera ? Object.keys(user.recordList.camera).length : 0;
+                const totalDevices = screenDevices + cameraDevices;
+
+                if (isOnline || totalDevices > 0) {
+                    html += `
+                        <div class="student-item ${currentStudent === user.stu_no ? 'active' : ''}"
+                             onclick="selectStudent('${user.stu_no}')">
+                            <div class="student-info">
+                                <div>
+                                    <div class="fw-bold">${user.stu_name}</div>
+                                    <div class="text-muted small">${user.stu_no}</div>
+                                    <div class="text-muted small">中断: ${user.interruptions || 0} | 时长: ${formatTime(Math.floor((user.accumulatedDuration || 0) / 1000))}</div>
+                                </div>
+                                <div class="recording-status">
+                                    ${isOnline ? `<span class="status-badge status-recording">在线</span>` : `<span class="status-badge status-offline">离线</span>`}
+                                    ${screenDevices > 0 ? `<span class="status-badge status-recording">屏幕(${screenDevices})</span>` : ''}
+                                    ${cameraDevices > 0 ? `<span class="status-badge status-recording">摄像头(${cameraDevices})</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (html === '') {
+                html = '<div class="p-3 text-muted text-center">暂无学生录制活动</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function selectStudent(studentId) {
+            console.log('选择学生:', studentId);
+            connectToStudent(studentId);
+            updateStudentList();
+        }
+
+        async function connectToStudent(studentId) {
+            try {
+                clearAllStreams();
+                currentStudent = studentId;
+
+                const user = allUsers[studentId];
+                if (!user) {
+                    throw new Error('学生不存在');
+                }
+
+                if (socket && socket.connected) {
+                    socket.emit('monitor:start', { targetUserId: studentId });
+                }
+
+                const promises = [];
+                
+                ['screen', 'camera'].forEach(type => {
+                    const recordList = user.recordList?.[type];
+                    if (!recordList) return;
+
+                    Object.entries(recordList).forEach(([socketId, recordInfo]) => {
+                        const promise = connectToStream(studentId, type, socketId, recordInfo);
+                        promises.push(promise);
+                    });
+                });
+
+                if (promises.length === 0) {
+                    throw new Error('该学生当前没有录制任何内容');
+                }
+
+                await Promise.race(promises);
+                
+            } catch (error) {
+                showError(`连接学生失败: ${error.message}`);
+                showNoVideo(error.message);
+            }
+        }
+
+        async function connectToStream(studentId, streamType, socketId, recordInfo) {
+            return new Promise((resolve, reject) => {
+                const deviceId = recordInfo.deviceId || socketId;
+                const deviceLabel = recordInfo.deviceLabel || recordInfo.device || socketId;
+                const targetPeerId = `${studentId}${streamType}${deviceId}`;
+                const streamId = `${studentId}-${streamType}-${socketId}`;
+
+                // 尝试连接流
+
+                const timeout = setTimeout(() => {
+                    reject(new Error(`连接超时: ${deviceLabel}`));
+                }, 30000);
+
+                const conn = peer.connect(targetPeerId);
+                
+                conn.on('open', () => {
+                    conn.send({
+                        type: 'monitor_request',
+                        from: peer.id,
+                        timestamp: Date.now()
+                    });
+                });
+
+                conn.on('error', (error) => {
+                    clearTimeout(timeout);
+                    reject(new Error(`数据连接失败: ${error.message}`));
+                });
+
+                const onIncomingCall = (call) => {
+                    if (call.peer === targetPeerId) {
+                        call.answer();
+                        
+                        call.on('stream', (remoteStream) => {
+                            // 检查流是否有效
+                            if (remoteStream.getTracks().length === 0) {
+                                console.warn(`接收到空流: ${targetPeerId}`);
+                                reject(new Error('接收到空的媒体流'));
+                                return;
+                            }
+                            
+                            clearTimeout(timeout);
+                            peer.off('call', onIncomingCall);
+                            
+                            addStream(streamId, call, remoteStream, {
+                                studentId,
+                                streamType,
+                                deviceId,
+                                deviceLabel,
+                                label: `${streamType === 'screen' ? '屏幕' : '摄像头'} - ${deviceLabel}`
+                            });
+                            
+                            resolve(call);
+                        });
+
+                        call.on('error', (error) => {
+                            console.error(`通话错误: ${targetPeerId}`, error);
+                            clearTimeout(timeout);
+                            peer.off('call', onIncomingCall);
+                            reject(error);
+                        });
+
+                        call.on('close', () => {
+                            peer.off('call', onIncomingCall);
+                            removeStream(streamId);
+                        });
+                    }
+                };
+
+                peer.on('call', onIncomingCall);
+            });
+        }
+
+        function addStream(streamId, call, remoteStream, streamInfo) {
+            console.log(`添加流: ${streamId}`);
+            
+            const video = document.createElement('video');
+            video.className = 'video-thumbnail';
+            video.autoplay = true;
+            video.muted = true;
+            video.playsInline = true; // 添加这个属性，特别是在移动设备上
+            video.onclick = () => switchToMain(streamId);
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'thumbnail-info';
+            infoDiv.textContent = streamInfo.label;
+
+            const container = document.createElement('div');
+            container.appendChild(video);
+            container.appendChild(infoDiv);
+
+            activeStreams.set(streamId, {
+                call,
+                video,
+                container,
+                info: streamInfo,
+                stream: remoteStream
+            });
+
+            // 直接设置视频流
+            video.srcObject = remoteStream;
+            
+            // 确保视频开始播放
+            video.play().catch(e => {
+                if (e.name !== 'AbortError') {
+                    console.warn(`视频播放失败: ${streamId}`, e);
+                }
+            });
+            
+            if (!currentMainStream) {
+                // 延迟一下确保视频元素准备好
+                setTimeout(() => {
+                    switchToMain(streamId);
+                }, 100);
+            } else {
+                const thumbnailArea = document.getElementById('thumbnail-area');
+                thumbnailArea.appendChild(container);
+                updateThumbnailVisibility();
+            }
+
+            call.on('close', () => {
+                removeStream(streamId);
+            });
+        }
+
+        function removeStream(streamId) {
+            const streamData = activeStreams.get(streamId);
+            if (!streamData) return;
+
+            if (streamData.container.parentNode) {
+                streamData.container.parentNode.removeChild(streamData.container);
+            }
+
+            if (currentMainStream === streamId) {
+                const remainingStreams = Array.from(activeStreams.keys()).filter(id => id !== streamId);
+                if (remainingStreams.length > 0) {
+                    switchToMain(remainingStreams[0]);
+                } else {
+                    currentMainStream = null;
+                    document.getElementById('main-video').srcObject = null;
+                    hideVideoInfo();
+                }
+            }
+
+            activeStreams.delete(streamId);
+            updateThumbnailVisibility();
+        }
+
+        function switchToMain(streamId) {
+            const streamData = activeStreams.get(streamId);
+            if (!streamData) {
+                console.warn('找不到流数据:', streamId);
+                return;
+            }
+
+            console.log('切换主视频:', streamData.info.label);
+
+            const mainVideo = document.getElementById('main-video');
+            const thumbnailArea = document.getElementById('thumbnail-area');
+
+            // 如果有当前主流，将其移到缩略图区域
+            if (currentMainStream && currentMainStream !== streamId) {
+                const currentMainData = activeStreams.get(currentMainStream);
+                if (currentMainData) {
+                    thumbnailArea.appendChild(currentMainData.container);
+                    currentMainData.video.classList.remove('active');
+                }
+            }
+
+            currentMainStream = streamId;
+            
+            // 设置主视频流
+            const sourceStream = streamData.stream || streamData.video.srcObject;
+            if (sourceStream) {
+                console.log('设置主视频流:', streamData.info.label);
+                mainVideo.srcObject = sourceStream;
+                
+                // 确保主视频开始播放
+                mainVideo.play().catch(e => {
+                    if (e.name !== 'AbortError') {
+                        console.warn('主视频播放失败:', e);
+                    }
+                });
+            } else {
+                console.warn('视频流为空:', streamId);
+            }
+
+            // 从缩略图区域移除当前流容器
+            if (streamData.container.parentNode === thumbnailArea) {
+                thumbnailArea.removeChild(streamData.container);
+            }
+
+            // 更新活跃状态
+            activeStreams.forEach((data, id) => {
+                data.video.classList.toggle('active', id === streamId);
+            });
+
+            updateVideoInfo(streamData.info);
+            updateThumbnailVisibility();
+        }
+
+        function updateThumbnailVisibility() {
+            const thumbnailArea = document.getElementById('thumbnail-area');
+            const hasThumbnails = thumbnailArea.children.length > 0;
+            thumbnailArea.classList.toggle('show', hasThumbnails);
+        }
+
+        function clearAllStreams() {
+            activeStreams.forEach((streamData, streamId) => {
+                if (streamData.call) {
+                    streamData.call.close();
+                }
+            });
+            activeStreams.clear();
+            currentMainStream = null;
+            document.getElementById('main-video').srcObject = null;
+            document.getElementById('thumbnail-area').innerHTML = '';
+            updateThumbnailVisibility();
+            hideVideoInfo();
+        }
+
+        function updateVideoInfo(streamInfo) {
+            const videoInfo = document.getElementById('video-info');
+            const statsPanel = document.getElementById('stats-panel');
+            
+            const user = allUsers[streamInfo.studentId];
+            
+            document.getElementById('current-student').textContent = `学生: ${user?.stu_name || streamInfo.studentId}`;
+            document.getElementById('current-stream').textContent = `当前: ${streamInfo.label}`;
+            
+            if (user) {
+                document.getElementById('current-student-name').textContent = user.stu_name;
+                document.getElementById('current-stream-type').textContent = streamInfo.streamType === 'screen' ? '屏幕录制' : '摄像头录制';
+                document.getElementById('current-device-name').textContent = streamInfo.deviceLabel || '未知设备';
+                document.getElementById('current-interruptions').textContent = user.interruptions || 0;
+                document.getElementById('current-duration').textContent = formatTime(Math.floor((user.accumulatedDuration || 0) / 1000));
+            }
+            
+            videoInfo.style.display = 'block';
+            statsPanel.style.display = 'block';
+            hideNoVideo();
+        }
+
+        function hideNoVideo() {
+            document.getElementById('no-video').style.display = 'none';
+        }
+
+        function hideVideoInfo() {
+            const videoInfo = document.getElementById('video-info');
+            const noVideo = document.getElementById('no-video');
+            const video = document.getElementById('main-video');
+            const statsPanel = document.getElementById('stats-panel');
+
+            videoInfo.style.display = 'none';
+            statsPanel.style.display = 'none';
+            noVideo.style.display = 'flex';
+            video.srcObject = null;
+        }
+
+        function showNoVideo(message) {
+            const noVideo = document.getElementById('no-video');
+            const videoInfo = document.getElementById('video-info');
+            const video = document.getElementById('main-video');
+            const statsPanel = document.getElementById('stats-panel');
+
+            noVideo.innerHTML = `<h4>${message}</h4>`;
+            noVideo.style.display = 'flex';
+            videoInfo.style.display = 'none';
+            statsPanel.style.display = 'none';
+            video.srcObject = null;
+        }
+
+        function showError(message) {
+            if (window.templateSystem && window.templateSystem.showError) {
+                window.templateSystem.showError(message);
+            } else {
+                console.error(message);
+                alert(message);
+            }
+        }
+
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+
+            if (hours > 0) {
+                return `${hours}小时${minutes}分${secs}秒`;
+            } else if (minutes > 0) {
+                return `${minutes}分${secs}秒`;
+            } else {
+                return `${secs}秒`;
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            clearAllStreams();
+            peer?.destroy();
+            socket?.disconnect();
+        });
+    </script>
+</body>
+</html> 

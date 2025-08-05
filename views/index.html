@@ -1,36 +1,147 @@
-{{extend './template.html'}}
+<!DOCTYPE html>
+<html lang="zh-cn">
 
-{{block 'title'}}主页{{/block}}
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>主页</title>
+</head>
 
-{{block 'content'}}
-<section id="features">
-    <h1 id="sentence" class="mt-5 mb-3 text-center"></h1>
-    <p id="info" class="me-5" style="text-align: right;"></p>
-    <div></div>
-    {{ if sessionUser }}
-    <div class="container-fluid text-center p-5">
-        <a style="display: none;" type="button" class="btn btn-success btn-lg m-5" href="/recordtest">测试设备</a>
-        {{ if sessionUser.stu_userlevel !== '1'}}
-        <a type="button" class="btn btn-warning btn-lg" href="/record">进入录制</a>
-        {{ else }}
-        <a type="button" class="btn btn-warning btn-lg" href="/monitor">进入监控</a>
-        <a style="display: none;" type="button" class="btn btn-info btn-lg" href="/history" target="_blank">历史视频</a>
-        {{ /if }}
-    </div>
-    {{ /if }}
-</section>
-{{/block}}
+<body id="page-top">
+    <!-- 导航栏和页脚将通过template.js自动添加 -->
+    
+    <section id="features">
+        <h1 id="sentence" class="mt-5 mb-3 text-center"></h1>
+        <p id="info" class="me-5" style="text-align: right;"></p>
+        <div></div>
+        <div class="container-fluid text-center p-5" id="main-buttons" style="display:none;">
+    
+            <a type="button" class="btn btn-warning btn-lg" href="/record" id="record-btn" style="display:none;">进入录制</a>
+            <a type="button" class="btn btn-warning btn-lg" href="/monitor" id="monitor-btn" style="display:none;">进入监控</a>
+            <a style="display: none;" type="button" class="btn btn-info btn-lg" href="/history" target="_blank">历史视频</a>
+        </div>
+    </section>
 
-{{block 'script'}}
-<script src="https://sdk.jinrishici.com/v2/browser/jinrishici.js" charset="utf-8"></script>
-<script type="text/javascript">
-    const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
-    jinrishici.load(result => {
-        const sentence = document.querySelector("#sentence");
-        const info = document.querySelector("#info");
-        sentence.innerHTML = result.data.content
-        info.innerHTML = `——【${result.data.origin.dynasty}】${result.data.origin.author}《${result.data.origin.title}》`
-        sentence.style.color = info.style.color = randomColor;
-    });
-</script>
-{{/block}}
+    <script src="/public/js/template.js"></script>
+
+    <script>
+        // 等待logger加载完成后开始执行
+        function waitForLogger() {
+            return new Promise(resolve => {
+                const checkLogger = () => {
+                    if (window.logger) resolve();
+                    else setTimeout(checkLogger, 100);
+                };
+                checkLogger();
+            });
+        }
+
+        (async () => {
+            await waitForLogger();
+            window.logger.debug('HomePage', '主页脚本开始执行, readyState:', document.readyState);
+        })();
+    </script>
+
+    <script>
+        // 使用更简单的方式等待DOM和模板系统
+        function initializePage() {
+            console.log('🏠 开始初始化主页...');
+
+            if (window.templateSystem && window.templateSystem.isInitialized) {
+                console.log('🏠 模板系统已就绪，更新页面内容');
+                updatePageContent();
+                loadTodayPoetry();
+            } else {
+                console.log('🏠 等待模板系统初始化...');
+                setTimeout(initializePage, 200);
+            }
+        }
+
+        // DOM加载完成后开始初始化
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('🏠 DOM加载完成');
+                initializePage();
+            });
+        } else {
+            console.log('🏠 DOM已就绪');
+            initializePage();
+        }
+
+        // 立即尝试初始化（用于调试）
+        setTimeout(() => {
+            console.log('🏠 5秒后强制初始化...');
+            initializePage();
+        }, 5000);
+
+        // 加载今日诗词
+        function loadTodayPoetry() {
+            try {
+                // 动态加载诗词API
+                const script = document.createElement('script');
+                script.src = 'https://sdk.jinrishici.com/v2/browser/jinrishici.js';
+                script.charset = 'utf-8';
+                script.onload = () => {
+                    if (typeof jinrishici !== 'undefined') {
+                        const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+                        jinrishici.load(result => {
+                            const sentence = document.querySelector("#sentence");
+                            const info = document.querySelector("#info");
+                            if (sentence && info && result && result.data) {
+                                sentence.innerHTML = result.data.content;
+                                info.innerHTML = `——【${result.data.origin.dynasty}】${result.data.origin.author}《${result.data.origin.title}》`;
+                                sentence.style.color = info.style.color = randomColor;
+                            }
+                        });
+                    }
+                };
+                script.onerror = () => {
+                    console.log('诗词API加载失败，使用默认内容');
+                    const sentence = document.querySelector("#sentence");
+                    const info = document.querySelector("#info");
+                    if (sentence && info) {
+                        sentence.innerHTML = '欢迎使用远程录屏系统';
+                        info.innerHTML = '';
+                    }
+                };
+                document.head.appendChild(script);
+            } catch (error) {
+                console.log('诗词加载出错:', error);
+            }
+        }
+
+        function updatePageContent() {
+            const sessionUser = window.templateSystem.sessionUser;
+
+            console.log('🏠 主页更新内容 - sessionUser:', sessionUser);
+            console.log('🏠 templateSystem状态:', window.templateSystem);
+
+            if (sessionUser) {
+                console.log('✅ 用户已登录，显示按钮');
+                document.getElementById('main-buttons').style.display = 'block';
+
+                // 根据用户级别显示不同按钮
+                const userLevel = parseInt(sessionUser.stu_userlevel || '0');
+                console.log('👤 用户级别:', userLevel);
+
+                // 所有用户都显示录制按钮
+                document.getElementById('record-btn').style.display = 'inline-block';
+
+                if (userLevel >= 1) {
+                    // 管理员或超级管理员还显示监控按钮
+                    document.getElementById('monitor-btn').style.display = 'inline-block';
+                    console.log('🔧 管理员用户，显示监控按钮');
+                } else {
+                    // 普通用户不显示监控按钮
+                    document.getElementById('monitor-btn').style.display = 'none';
+                    console.log('👨‍🎓 普通用户，隐藏监控按钮');
+                }
+            } else {
+                console.log('❌ 用户未登录，隐藏所有按钮');
+                document.getElementById('main-buttons').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
