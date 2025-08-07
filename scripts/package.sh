@@ -6,7 +6,20 @@
 set -e
 
 # 获取版本信息
-VERSION="2.0"
+# 从 package.json 自动获取版本号
+if command -v node >/dev/null 2>&1; then
+    VERSION=$(node -p "require('./package.json').version")
+else
+    # 如果没有 node，使用 grep 和 sed 提取版本
+    VERSION=$(grep '"version"' package.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+fi
+
+# 检查是否成功获取版本号
+if [ -z "$VERSION" ]; then
+    echo "错误: 无法从 package.json 获取版本号"
+    exit 1
+fi
+
 PACKAGE_NAME="webrtc-monitor-v${VERSION}"
 BUILD_DATE=$(date '+%Y-%m-%d_%H%M%S')
 
@@ -27,7 +40,6 @@ tar -czf "dist/${PACKAGE_NAME}.tar.gz" \
     --exclude='logs' \
     --exclude='temp' \
     --exclude='.git' \
-    --exclude='.claude' \
     --exclude='*.log' \
     --exclude='.DS_Store' \
     --exclude='Thumbs.db' \
@@ -35,6 +47,10 @@ tar -czf "dist/${PACKAGE_NAME}.tar.gz" \
     --exclude='*.swo' \
     --exclude='coverage' \
     --exclude='.pm2' \
+    --exclude='.claude' \
+    --exclude='.cursorrules' \
+    --exclude='.gitignore' \
+    --exclude='.gitattributes' \
     .
 
 # 显示打包结果

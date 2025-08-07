@@ -16,7 +16,7 @@ import {
     ValidationError,
     NotFoundError
 } from '../types';
-import { videoConfig, networkConfig, serverConfig, databaseConfig } from '../../config';
+import { videoConfig, networkConfig, serverConfig, databaseConfig } from '../config';
 import { 
     addLog, 
     getUserById, 
@@ -110,6 +110,7 @@ export const createApiController = (io: SocketIOServer) => {
                 };
                 return res.json(response);
             } catch (error) {
+                // 错误日志在生产环境也需要输出，便于监控
                 console.error('获取系统状态失败:', error);
                 const response: ApiResponse = {
                     success: false,
@@ -210,7 +211,7 @@ export const createApiController = (io: SocketIOServer) => {
             // 获取有权限查看的学生列表
             const userLevel = parseInt(req.session.user.stu_userlevel);
             const queryType = userLevel >= 5 ? 'all' : 'valid';
-            
+
             const stulist = databaseConfig.stulist === 'exam' ?
                 await getMonitorExamStuList(
                     databaseConfig.term || '',
@@ -220,9 +221,9 @@ export const createApiController = (io: SocketIOServer) => {
                     queryType
                 ) :
                 await getMonitorStuList(req.session.user.stu_no, queryType);
-                
+
             const allowedStudents = new Set(stulist.map((user: any) => user.sno));
-            
+
             // 遍历允许查看的学生，查找其录制文件
             for (const studentNo of allowedStudents) {
                 const userPath = path.join(serverConfig.savePath, `u${studentNo}`);
@@ -279,19 +280,19 @@ export const createApiController = (io: SocketIOServer) => {
                 throw new ValidationError('用户session无效');
             }
 
-            const stulist = databaseConfig.stulist === 'exam' ? 
+            const stulist = databaseConfig.stulist === 'exam' ?
                 await getMonitorExamStuList(
-                    databaseConfig.term || '', 
-                    databaseConfig.cno || '', 
-                    databaseConfig.eno || '', 
-                    req.session.user.stu_no, 
+                    databaseConfig.term || '',
+                    databaseConfig.cno || '',
+                    databaseConfig.eno || '',
+                    req.session.user.stu_no,
                     databaseConfig.type
-                ) : 
+                ) :
                 await getMonitorStuList(req.session.user.stu_no, databaseConfig.type);
             
             const stu_no_set = new Set(stulist.map((user: any) => user.sno));
             const threshold = 5;
-            
+
             const getLatestWebmInfo = (folderPath: string): FileInfo | null => {
                 try {
                     if (!fs.existsSync(folderPath)) {
@@ -507,6 +508,49 @@ export const createApiController = (io: SocketIOServer) => {
                 timestamp: new Date().toISOString()
             };
             res.json(response);
+        }],
+
+        /**
+         * 记录前端错误日志
+         */
+        logError: [async (req: AuthenticatedRequest, res: Response) => {
+            try {
+                const { component, error, userAgent, timestamp, url } = req.body;
+
+                // 记录错误到数据库或日志文件
+                if (process.env.NODE_ENV !== 'production') {
+                    // 开发环境输出详细前端错误信息
+                    console.error('前端错误:', {
+                        component,
+                        error,
+                        userAgent,
+                        timestamp,
+                        url,
+                        user: req.session?.user?.stu_no || 'anonymous'
+                    });
+                } else {
+                    // 生产环境只输出关键信息
+                    console.error(`前端错误 [${component}]: ${error} - 用户: ${req.session?.user?.stu_no || 'anonymous'}`);
+                }
+
+                // 可以选择记录到数据库
+                // await addLog("frontend_error", JSON.stringify({ component, error, userAgent, url }));
+
+                const response: ApiResponse = {
+                    success: true,
+                    message: '错误日志已记录',
+                    timestamp: new Date().toISOString()
+                };
+                res.json(response);
+            } catch (error) {
+                console.error('记录前端错误失败:', error);
+                const response: ApiResponse = {
+                    success: false,
+                    message: '记录错误日志失败',
+                    timestamp: new Date().toISOString()
+                };
+                res.status(500).json(response);
+            }
         }]
     };
 };

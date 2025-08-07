@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { getAllUsers } from './database';
 import { getTime, User, DatabaseUser } from './utils';
 import { Server as SocketIOServer } from 'socket.io';
-import { serverConfig, databaseConfig } from '../../config';
+import { getServerConfig, getDatabaseConfig } from '../config';
 
 /**
  * 录制设备状态接口
@@ -65,6 +65,7 @@ let AllUsers: AllUsersState = {};
  */
 export const initializeUsers = async (): Promise<void> => {
     try {
+        const serverConfig = getServerConfig();
         const allUsersArray = await getAllUsers();
         for (const user of allUsersArray) {
             const path = serverConfig.savePath + '/u' + user.stu_no + '/';
@@ -140,6 +141,7 @@ export const addUser = (user: DatabaseUser, userIP: string): void => {
         AllUsers[user.stu_no].loginTime = new Date().toISOString();
     } else {
         // 创建新用户状态
+        const serverConfig = getServerConfig();
         const path = serverConfig.savePath + '/u' + user.stu_no + '/';
         fs.mkdirSync(path, { recursive: true });
 
@@ -184,10 +186,11 @@ export const removeUser = (userId: string): void => {
  * @returns 定时器ID或null
  */
 export const setupTimeChecker = (io: SocketIOServer): NodeJS.Timeout | null => {
+    const databaseConfig = getDatabaseConfig();
     if (!databaseConfig.endtime) {
         return null;
     }
-    
+
     const targetTime = new Date(databaseConfig.endtime).getTime();
     
     const checkTime = (): void => {

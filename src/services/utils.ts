@@ -95,9 +95,15 @@ export const updateAccumulatedDuration = (user: any): void => {
                         // 计算这个设备的录制时长
                         const deviceDuration = currentTime - deviceState.startTime;
                         totalDuration += deviceDuration;
-                        console.log(`📊 设备 ${deviceState.deviceId} 录制时长: ${Math.floor(deviceDuration / 1000)}秒`);
+                        // 只在开发环境输出详细录制信息
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.log(`📊 设备 ${deviceState.deviceId} 录制时长: ${Math.floor(deviceDuration / 1000)}秒`);
+                        }
                     } else {
-                        console.log(`⏸️ 设备 ${deviceState.deviceId} 录制暂停中（无文件活动超过30秒）`);
+                        // 只在开发环境输出暂停信息
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.log(`⏸️ 设备 ${deviceState.deviceId} 录制暂停中（无文件活动超过30秒）`);
+                        }
                     }
                     
                     // 更新设备的最后活动时间

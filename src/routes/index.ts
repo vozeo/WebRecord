@@ -38,6 +38,7 @@ export const setupRoutes = (app: Application, io: SocketIOServer): void => {
         app.post('/api/user-status', auth, opAuth, asyncHandler(apiController.updateUserStatus[0]));
         app.post('/api/emit', auth, opAuth, asyncHandler(apiController.emitMessage[0]));
         app.post('/api/manage', auth, opAuth, asyncHandler(apiController.manageExam[0]));
+        app.post('/api/log-error', asyncHandler(apiController.logError[0])); // 错误日志记录，不需要特殊权限
 
         // 认证路由
         app.post('/api/login', asyncHandler(authController.login));

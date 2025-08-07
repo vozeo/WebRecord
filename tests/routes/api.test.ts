@@ -4,11 +4,11 @@ jest.mock('../../middleware/auth', () => ({
     opAuth: (req: any, res: any, next: any) => next(),
     getUser: jest.fn()
 }));
-jest.mock('../../config', () => ({
-    videoConfig: { width: 1920, height: 1080 },
-    networkConfig: { socketPort: 7080 },
-    serverConfig: { savePath: '/test/path' },
-    databaseConfig: { stulist: 'normal', type: 'valid' }
+jest.mock('../../src/config', () => ({
+    getVideoConfig: () => ({ width: 1920, height: 1080 }),
+    getNetworkConfig: () => ({ socketPort: 7080 }),
+    getServerConfig: () => ({ savePath: '/test/path' }),
+    getDatabaseConfig: () => ({ stulist: 'normal', type: 'valid' })
 }));
 jest.mock('../../services/database', () => ({
     addLog: jest.fn().mockResolvedValue(undefined),

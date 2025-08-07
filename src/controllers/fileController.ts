@@ -7,7 +7,7 @@ import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AuthenticatedRequest, ApiResponse, ValidationError, NotFoundError } from '../types';
-import { serverConfig } from '../../config';
+import { serverConfig } from '../config';
 
 /**
  * 创建文件控制器
@@ -19,7 +19,7 @@ export const createFileController = () => {
          */
         downloadFile: [async (req: AuthenticatedRequest, res: Response) => {
             const { studentId, filename } = req.params;
-            
+
             if (!studentId || !filename) {
                 throw new ValidationError('学生ID和文件名不能为空');
             }
@@ -31,7 +31,7 @@ export const createFileController = () => {
 
             // 构建文件路径
             const filePath = path.join(serverConfig.savePath, `u${studentId}`, filename);
-            
+
             // 安全检查：确保文件路径在允许的目录内
             const normalizedPath = path.normalize(filePath);
             const basePath = path.normalize(serverConfig.savePath);
@@ -76,7 +76,7 @@ export const createFileController = () => {
          */
         deleteFile: [async (req: AuthenticatedRequest, res: Response) => {
             const { studentId, filename } = req.params;
-            
+
             if (!studentId || !filename) {
                 throw new ValidationError('学生ID和文件名不能为空');
             }
@@ -88,7 +88,7 @@ export const createFileController = () => {
 
             // 构建文件路径
             const filePath = path.join(serverConfig.savePath, `u${studentId}`, filename);
-            
+
             // 安全检查：确保文件路径在允许的目录内
             const normalizedPath = path.normalize(filePath);
             const basePath = path.normalize(serverConfig.savePath);
@@ -122,7 +122,7 @@ export const createFileController = () => {
          */
         playVideoHead: [async (req: AuthenticatedRequest, res: Response) => {
             const { studentId, filename } = req.params;
-            
+
             if (!studentId || !filename) {
                 throw new ValidationError('学生ID和文件名不能为空');
             }
@@ -139,7 +139,7 @@ export const createFileController = () => {
 
             // 构建文件路径
             const filePath = path.join(serverConfig.savePath, `u${studentId}`, filename);
-            
+
             // 安全检查：确保文件路径在允许的目录内
             const normalizedPath = path.normalize(filePath);
             const basePath = path.normalize(serverConfig.savePath);
@@ -181,7 +181,7 @@ export const createFileController = () => {
          */
         getFileInfo: [async (req: AuthenticatedRequest, res: Response) => {
             const { studentId, filename } = req.params;
-            
+
             if (!studentId || !filename) {
                 throw new ValidationError('学生ID和文件名不能为空');
             }
@@ -193,7 +193,7 @@ export const createFileController = () => {
 
             // 构建文件路径
             const filePath = path.join(serverConfig.savePath, `u${studentId}`, filename);
-            
+
             // 安全检查：确保文件路径在允许的目录内
             const normalizedPath = path.normalize(filePath);
             const basePath = path.normalize(serverConfig.savePath);
@@ -230,7 +230,7 @@ export const createFileController = () => {
          */
         listFiles: [async (req: AuthenticatedRequest, res: Response) => {
             const { studentId } = req.params;
-            
+
             if (!studentId) {
                 throw new ValidationError('学生ID不能为空');
             }

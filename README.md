@@ -138,14 +138,13 @@ WebRTC/
 │   ├── css/                # 样式文件
 │   └── assets/             # 其他静态资源
 ├── views/                  # HTML模板文件
-│   ├── index.html          # 首页
 │   ├── login.html          # 登录页
 │   ├── record.html         # 录制页
 │   ├── monitor.html        # 监控页
 │   ├── history.html        # 历史记录页
 │   ├── password.html       # 密码修改页
 │   ├── live.html           # 实时视频页
-│   └── monitor_file.html   # 文件监控页
+│   └── video.html          # 视频播放页
 ├── scripts/                # 脚本文件
 │   ├── check_password.js   # 密码检查脚本
 │   ├── reset_admin_password.js # 重置管理员密码

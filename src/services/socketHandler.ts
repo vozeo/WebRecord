@@ -3,7 +3,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { addLog } from './database';
 import { handleInterrupt, updateAccumulatedDuration } from './utils';
 import { getAllUsersState, getUserState, updateUserState } from './userManager';
-import { serverConfig } from '../../config';
+import { serverConfig } from '../config';
 import { recordManager } from './recordManager';
 
 // Socket状态管理
@@ -37,17 +37,22 @@ const MIN_BROADCAST_INTERVAL = 2000; // 最小间隔2秒，防止过于频繁
 
 // 日志辅助函数
 async function logInfo(user: any, ip: string, action: string, message: string): Promise<void> {
-    console.log(`ℹ️ [${action}] ${user ? `${user.stu_name}(${user.stu_no})` : 'Unknown'}: ${message}`);
+    // 开发环境输出到控制台，生产环境只写入数据库
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`ℹ️ [${action}] ${user ? `${user.stu_name}(${user.stu_no})` : 'Unknown'}: ${message}`);
+    }
     await addLog(user, ip, action, message);
 }
 
 async function logError(user: any, ip: string, action: string, message: string, error?: any): Promise<void> {
     const errorMsg = error ? `${message} - ${error.message || error}` : message;
+    // 错误日志在生产环境也需要输出到控制台，便于监控
     console.error(`❌ [${action}] ${user ? `${user.stu_name}(${user.stu_no})` : 'Unknown'}: ${errorMsg}`);
     await addLog(user, ip, action, errorMsg);
 }
 
 async function logWarning(user: any, ip: string, action: string, message: string): Promise<void> {
+    // 警告日志在生产环境也需要输出到控制台，便于监控
     console.warn(`⚠️ [${action}] ${user ? `${user.stu_name}(${user.stu_no})` : 'Unknown'}: ${message}`);
     await addLog(user, ip, action, message);
 }
@@ -103,8 +108,10 @@ function startStatusUpdateTimer(io: SocketIOServer): void {
             broadcastStatusToAdmins(io, true); // 定时更新强制广播
         }
     }, BROADCAST_INTERVAL);
-    
-    console.log(`⏰ 状态更新定时器已启动，间隔: ${BROADCAST_INTERVAL}ms`);
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`⏰ 状态更新定时器已启动，间隔: ${BROADCAST_INTERVAL}ms`);
+    }
 }
 
 // 停止定时状态更新
@@ -112,7 +119,9 @@ function stopStatusUpdateTimer(): void {
     if (statusUpdateTimer) {
         clearInterval(statusUpdateTimer);
         statusUpdateTimer = null;
-        console.log(`⏰ 状态更新定时器已停止`);
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`⏰ 状态更新定时器已停止`);
+        }
     }
 }
 
@@ -123,7 +132,9 @@ function stopStatusUpdateTimer(): void {
 export const setupSocketHandlers = (io: SocketIOServer): void => {
     const isDevelopment = process.env.NODE_ENV !== 'production';
 
-    console.log('🔌 Socket.IO事件处理器已设置');
+    if (isDevelopment) {
+        console.log('🔌 Socket.IO事件处理器已设置');
+    }
 
     io.on('connection', async (socket: Socket) => {
         const userIP = socket.handshake.address;

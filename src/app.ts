@@ -14,11 +14,19 @@ import { ExpressPeerServer } from 'peer';
 import { Server as SocketIOServer } from 'socket.io';
 import 'express-async-errors';
 
-import { serverConfig, networkConfig, videoConfig, databaseConfig } from '../config';
+import {
+    configManager,
+    getServerConfig,
+    getNetworkConfig,
+    getVideoConfig,
+    getDatabaseConfig,
+    getRedisConfig
+} from './config';
 import { errorHandler } from './middleware/errorHandler';
 import { setupRoutes } from './routes';
 import { setupSocketHandlers } from './services/socketHandler';
 import { initializeUsers, setupTimeChecker } from './services/userManager';
+import { recreatePool } from './services/database';
 
 /**
  * 应用实例接口
@@ -35,6 +43,11 @@ interface AppInstance {
 const createApp = async (): Promise<AppInstance> => {
     const app: Application = express();
 
+    // 获取当前配置
+    const serverConfig = getServerConfig();
+    const networkConfig = getNetworkConfig();
+    const redisConfig = getRedisConfig();
+
     // 创建HTTPS服务器
     const server = https.createServer({
         key: fs.readFileSync(serverConfig.keyPath),
@@ -49,12 +62,8 @@ const createApp = async (): Promise<AppInstance> => {
     app.use(express.urlencoded({ extended: true }));
     
     // 静态文件服务 - 必须在路由设置之前
-    // 动态计算项目根目录路径（兼容开发和生产环境）
-    // 在生产环境中，__dirname是 /path/to/project/dist/src
-    // 在开发环境中，__dirname是 /path/to/project/src
-    const projectRoot = __dirname.includes('dist')
-        ? path.resolve(__dirname, '../..') // 生产环境：从 dist/src 回到项目根目录
-        : path.resolve(__dirname, '..'); // 开发环境：从 src 回到项目根目录
+    // 计算项目根目录路径（现在src直接编译到dist，所以都是回到上一级）
+    const projectRoot = path.resolve(__dirname, '..');
 
     console.log('项目根目录:', projectRoot);
     console.log('当前目录:', __dirname);
@@ -65,8 +74,12 @@ const createApp = async (): Promise<AppInstance> => {
     app.use('/node_modules', express.static(path.join(projectRoot, 'node_modules')));
 
     // Redis客户端设置
+    const redisUrl = redisConfig.password
+        ? `redis://:${redisConfig.password}@${redisConfig.host}:${redisConfig.port}/${redisConfig.db}`
+        : `redis://${redisConfig.host}:${redisConfig.port}/${redisConfig.db}`;
+
     const redisClient = createClient({
-        url: 'redis://127.0.0.1:6379'
+        url: redisUrl
     });
 
     redisClient.on('error', (err) => {
@@ -170,36 +183,45 @@ const createApp = async (): Promise<AppInstance> => {
 };
 
 /**
- * 设置配置文件监控
+ * 设置配置更新监听器
  */
 const setupConfigWatcher = (): void => {
-    const configPath = path.resolve(__dirname, '../config.ts');
-    
-    console.log('📁 正在设置配置文件监控:', configPath);
-    
-    fs.watchFile(configPath, (curr, prev) => {
-        console.log('🔄 检测到配置文件变化，正在重载配置...');
-        
-        try {
-            // 清除require缓存
-            delete require.cache[configPath];
-            
-            // 重新加载配置
-            const newConfig = require('../config');
-            
-            // 更新内存中的配置对象
-            Object.assign(serverConfig, newConfig.serverConfig);
-            Object.assign(databaseConfig, newConfig.databaseConfig);
-            Object.assign(videoConfig, newConfig.videoConfig);
-            Object.assign(networkConfig, newConfig.networkConfig);
-            
-            console.log('✅ 配置文件重载成功！');
-            console.log('🔄 新配置已生效，需要重启服务器以应用网络配置变化');
-        } catch (error) {
-            console.error('❌ 配置文件重载失败:', error);
-            console.error('⚠️ 请检查配置文件语法是否正确');
+    // 使用新的配置管理器的监听功能
+    configManager.addConfigListener((event) => {
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`🔄 配置段 ${event.section} 已更新`);
+        }
+
+        // 根据配置类型执行相应的更新操作
+        switch (event.section) {
+            case 'database':
+                // 数据库配置更新时重新创建连接池
+                try {
+                    recreatePool();
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('✅ 数据库连接池已重新创建');
+                    }
+                } catch (error) {
+                    console.error('❌ 数据库连接池重新创建失败:', error);
+                }
+                break;
+            case 'network':
+                console.log('⚠️ 网络配置更改需要重启服务器才能生效');
+                break;
+            case 'server':
+                console.log('⚠️ 服务器配置更改需要重启服务器才能生效');
+                break;
+            default:
+                if (process.env.NODE_ENV !== 'production') {
+                    console.log('✅ 配置已热更新');
+                }
+                break;
         }
     });
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('📁 配置文件监控已启用');
+    }
 };
 
 /**
@@ -207,24 +229,33 @@ const setupConfigWatcher = (): void => {
  */
 const startServer = async (): Promise<AppInstance> => {
     try {
-        console.log('正在初始化数据库连接...');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('正在初始化数据库连接...');
+        }
         await initializeUsers();
 
-        console.log('正在创建应用实例...');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('正在创建应用实例...');
+        }
         const { app, server, io } = await createApp();
 
-        console.log('正在设置定时任务...');
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('正在设置定时任务...');
+        }
         setupTimeChecker(io);
-        
+
         // 设置配置文件监控
         setupConfigWatcher();
 
-        console.log(`正在启动HTTPS服务器，端口: ${networkConfig.socketPort}`);
-        server.listen(networkConfig.socketPort, () => {
+        const networkConfig = getNetworkConfig();
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`正在启动HTTPS服务器，端口: ${networkConfig.socketPort}`);
+        }
+        server.listen(networkConfig.socketPort, '0.0.0.0', () => {
             console.log(`✅ WebRTC监控系统启动成功！`);
-            console.log(`🌐 HTTPS服务器运行在: https://127.0.0.1:${networkConfig.socketPort}`);
-            console.log(`🔍 健康检查: https://127.0.0.1:${networkConfig.socketPort}/health`);
-            console.log(`📁 配置文件监控已启用，修改config.ts将自动重载`);
+            console.log(`🌐 HTTPS服务器运行在: https://0.0.0.0:${networkConfig.socketPort}`);
+            console.log(`🔍 健康检查: https://0.0.0.0:${networkConfig.socketPort}/health`);
+            console.log(`📁 配置文件监控已启用，修改配置文件将自动重载`);
         });
 
         return { app, server, io };
@@ -238,7 +269,7 @@ const startServer = async (): Promise<AppInstance> => {
  * 优雅关闭
  */
 const gracefulShutdown = (signal: string) => {
-    console.log(`\n收到 ${signal} 信号，正在优雅关闭服务器...`);
+    console.log(`\n收到 ${signal} 信号，正在关闭服务器...`);
     
     // 这里可以添加清理逻辑
     setTimeout(() => {
@@ -247,15 +278,19 @@ const gracefulShutdown = (signal: string) => {
     }, 1000);
 };
 
-// 注册优雅关闭信号处理
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
 /**
  * 启动应用程序
  */
 async function main(): Promise<void> {
     try {
+        // 输出环境信息
+        const nodeEnv = process.env.NODE_ENV || "";
+        console.log(`📋 当前环境: ${nodeEnv}`);
+
+        // 注册优雅关闭信号处理（只在主进程中注册）
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
         console.log('🚀 正在启动WebRTC监控系统...');
         await startServer();
     } catch (error) {

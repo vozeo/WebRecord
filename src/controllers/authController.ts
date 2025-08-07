@@ -89,6 +89,7 @@ export const createAuthController = () => {
             // 销毁session
             req.session.destroy((err: any) => {
                 if (err) {
+                    // 错误日志在生产环境也需要输出，便于监控
                     console.error('销毁session时出错:', err);
                 }
             });

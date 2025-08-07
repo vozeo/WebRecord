@@ -79,7 +79,6 @@ dist
 
 # Gatsby files
 .cache/
-public
 
 # Storybook build outputs
 .out
@@ -161,3 +160,8 @@ wheels/
 
 trash/
 config.ts
+
+# 环境变量文件（保护敏感信息）
+.env
+!.env.example
+scripts/*.sql

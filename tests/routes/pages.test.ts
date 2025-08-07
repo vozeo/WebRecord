@@ -82,12 +82,14 @@ describe('Pages Router', () => {
     });
 
     describe('GET /', () => {
-        it('should render index page', async () => {
+        it('should redirect based on user permissions', async () => {
+            // 这个测试需要重写以测试重定向逻辑
+            // 因为首页现在是重定向而不是渲染HTML
             const response = await request(app).get('/');
-            
-            expect(response.status).toBe(200);
-            expect(response.text).toContain('Mock render');
-            expect(response.text).toContain('Test User');
+
+            // 根据mock用户的权限级别，应该重定向到监控页面
+            expect(response.status).toBe(302); // 重定向状态码
+            expect(response.headers.location).toBe('/monitor'); // 管理员重定向到监控页面
         });
     });
 

@@ -55,16 +55,7 @@ export class ErrorHandler {
             this.logError(error, { source: 'uncaughtException' });
         });
 
-        // 优雅关闭处理
-        process.on('SIGTERM', () => {
-            console.log('收到 SIGTERM 信号，正在优雅关闭服务器...');
-            process.exit(0);
-        });
 
-        process.on('SIGINT', () => {
-            console.log('收到 SIGINT 信号，正在优雅关闭服务器...');
-            process.exit(0);
-        });
     }
 
     /**
@@ -79,24 +70,33 @@ export class ErrorHandler {
         };
 
         this.errorLogs.push(errorLog);
-        
+
         // 保持日志数量在限制内
         if (this.errorLogs.length > this.maxLogs) {
             this.errorLogs = this.errorLogs.slice(-this.maxLogs);
         }
 
-        // 控制台输出错误
-        console.error('=== 错误处理器 ===');
-        console.error('时间:', errorLog.timestamp);
-        console.error('错误:', errorLog.error);
-        if (errorLog.stack) {
-            console.error('堆栈:', errorLog.stack);
+        // 控制台输出错误（生产环境简化输出）
+        if (process.env.NODE_ENV === 'production') {
+            // 生产环境只输出关键错误信息
+            console.error(`[${errorLog.timestamp}] ERROR: ${errorLog.error}`);
+            if (context.url) {
+                console.error(`URL: ${context.url}`);
+            }
+        } else {
+            // 开发环境输出详细错误信息
+            console.error('=== 错误处理器 ===');
+            console.error('时间:', errorLog.timestamp);
+            console.error('错误:', errorLog.error);
+            if (errorLog.stack) {
+                console.error('堆栈:', errorLog.stack);
+            }
+            if (context.url) {
+                console.error('URL:', context.url);
+            }
+            console.error('上下文:', context);
+            console.error('==================');
         }
-        if (context.url) {
-            console.error('URL:', context.url);
-        }
-        console.error('上下文:', context);
-        console.error('==================');
     }
 
     /**

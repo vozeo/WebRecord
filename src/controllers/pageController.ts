@@ -11,7 +11,12 @@ import * as fs from 'fs';
  * 页面控制器
  */
 export const createPageController = () => {
-    const viewsPath = path.join(__dirname, '../../views');
+    // 计算views目录路径
+    // 开发环境：从 src/controllers 回到项目根目录
+    // 生产环境：从 dist/controllers 回到项目根目录
+    const projectRoot = path.resolve(__dirname, '../..');
+
+    const viewsPath = path.join(projectRoot, 'views');
 
     /**
      * 发送HTML文件
@@ -19,7 +24,7 @@ export const createPageController = () => {
     const sendHtmlFile = (filename: string) => {
         return (req: Request, res: Response) => {
             const filePath = path.join(viewsPath, filename);
-            
+
             if (!fs.existsSync(filePath)) {
                 res.status(404).send(`
                     <!DOCTYPE html>

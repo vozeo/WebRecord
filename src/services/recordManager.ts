@@ -1,4 +1,4 @@
-import { videoConfig } from '../../config';
+import { getVideoConfig } from '../config';
 import { getAllUsersState, getUserState, DeviceRecordState } from './userManager';
 import { addLog } from './database';
 
@@ -22,6 +22,7 @@ export class RecordManager {
             return { canStart: false, reason: '用户不存在' };
         }
 
+        const videoConfig = getVideoConfig();
         const config = videoConfig.allowRecord[type];
         
         // 检查是否启用该类型录制
@@ -106,6 +107,7 @@ export class RecordManager {
             
             // 检查是否达到最大设备数
             const totalActive = this.getTotalActiveDeviceCount(userId);
+            const videoConfig = getVideoConfig();
             const maxTotal = videoConfig.allowRecord.screen.maxDevices + videoConfig.allowRecord.camera.maxDevices;
             user.recordingStats.maxDevicesReached = totalActive >= maxTotal;
 
@@ -151,6 +153,7 @@ export class RecordManager {
             
             // 重新检查最大设备数状态
             const totalActive = this.getTotalActiveDeviceCount(userId);
+            const videoConfig = getVideoConfig();
             const maxTotal = videoConfig.allowRecord.screen.maxDevices + videoConfig.allowRecord.camera.maxDevices;
             user.recordingStats.maxDevicesReached = totalActive >= maxTotal;
 
@@ -255,6 +258,7 @@ export class RecordManager {
 
         const screenActive = this.getActiveDeviceCount(userId, 'screen');
         const cameraActive = this.getActiveDeviceCount(userId, 'camera');
+        const videoConfig = getVideoConfig();
         const screenConfig = videoConfig.allowRecord.screen;
         const cameraConfig = videoConfig.allowRecord.camera;
 

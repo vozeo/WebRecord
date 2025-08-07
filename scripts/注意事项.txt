@@ -1,0 +1,15 @@
+1、录屏服务器自身地址修改（10.80.42.181 => 10.80.42.182，需要修改的内容
+   /diskb/WebRTC/turnserver.conf
+   /diskb/WebRTC/config.js中的const databaseConfig
+
+2、考试服务器的地址修改（192.168.1.241 => 192.168.1.188）需要修改的内容
+   206房间的192.168.1.1路由器中 6080/63306 的映射要打开，且映射的IP地址要一致
+
+3、更换一场考试
+   /diskb/WebRTC/config.js中的const databaseConfig
+
+4、录屏服务器的web端口号
+   /diskb/WebRTC/config.js中的const networkConfig
+
+5、录屏服务器的conturn的端口号
+   /diskb/WebRTC/config.js中的const networkConfig

@@ -97,9 +97,9 @@
                 window.logger.info('RecordPage', '权限检查通过，用户可以录制');
             }
 
-            // 先加载PeerJS库
+            // 先加载PeerJS库（使用本地版本）
             const peerScript = document.createElement('script');
-            peerScript.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+            peerScript.src = '/node_modules/peerjs/dist/peerjs.min.js';
             peerScript.onload = () => {
                 if (window.logger) {
                     window.logger.debug('RecordPage', 'PeerJS库加载完成');

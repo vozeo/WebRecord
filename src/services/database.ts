@@ -1,8 +1,29 @@
 import * as mysql from 'mysql2/promise';
 import { User, DatabaseUser } from './utils';
-import { databaseConfig, mysqlConnectionConfig, DatabaseConfig, MysqlConnectionConfig } from '../../config';
+import { getDatabaseConfig, MysqlConnectionConfig } from '../config';
 
-const pool = mysql.createPool(mysqlConnectionConfig as MysqlConnectionConfig);
+// 创建数据库连接池
+const createPool = () => {
+    const dbConfig = getDatabaseConfig();
+    const mysqlConfig: MysqlConnectionConfig = {
+        host: dbConfig.host,
+        port: dbConfig.port,
+        database: dbConfig.database,
+        user: dbConfig.user,
+        password: dbConfig.password,
+    };
+    return mysql.createPool(mysqlConfig);
+};
+
+let pool = createPool();
+
+/**
+ * 重新创建数据库连接池（用于配置热更新）
+ */
+export const recreatePool = (): void => {
+    pool.end(); // 关闭现有连接池
+    pool = createPool(); // 创建新的连接池
+};
 
 /**
  * 数据库查询函数
